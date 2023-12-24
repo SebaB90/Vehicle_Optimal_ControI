@@ -106,3 +106,30 @@ diff = xx_plus - x_plus
 check = diff - np.dot(fx,ddx)
 
 print (check)
+
+# Evaluate the equilibrium
+
+#eq1                            
+x3=1
+x4=0
+
+def equations(vars):
+    u0, u1, x5 = vars
+    Beta = [u0 - (x3*np.sin(x4) + a*x5)/(x3*np.cos(x4)), - (x3*np.sin(x4) - b*x5)/(x3*np.cos(x4))]    # Beta = [Beta_f, Beta_r]
+    Fz = [m*g*b/(a+b), m*g*a/(a+b)]             # Fz = [F_zf, F_zr]
+    Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]   # Fy = [F_yf, F_yr]
+
+    eq1 = x3 + dt*((Fy[1] * np.sin(x4) + u1 * np.cos(x4 - u0) + Fy[0] * np.sin(x4 - u0))/m)                     # V dot
+    eq2 = x4 + dt*((Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - u0) - u1 * np.sin(x4 - u0))/(m * x3) - x5)     # Beta dot
+    eq3 = x5 + dt*(((u1 * np.sin(u0) + Fy[0] * np.cos(u0)) * a - Fy[1] * b)/Iz)                                       # Psi dot dot
+
+    return [eq1, eq2, eq3]
+
+# Initial guess for the solution
+initial_guess = [0, 0, 0]
+
+# Use fsolve to find the solution
+solution = fsolve(equations, initial_guess)
+
+# Print the result
+print(f'Solution: {solution}')
