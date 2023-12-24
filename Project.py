@@ -7,6 +7,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import fsolve
 
 ##### TASK 0: DISCRETIZATION #####
 
@@ -55,8 +56,8 @@ def dynamics (x, u):
 
 ##### TASK 1: TRAJECTORY GENERATION #####
 
-# We have to find the eqilibria for the system, a way to do that is to use the cornering equilibria, those associated to the systems with Betadot, Vdot and Psidodot = 0
-# Once I have set them I can concentrate on the last three equation, then imposing Veq and PsidotEq (I can think of this also as Veq/R with R a certain imposed radious) we obtain Betaeq, Fxeq and Deltaeq, in alternative I can set Veq and Betaeq and as concequence find the other eqilibrium values.
+# We have to find the eqilibria for the system, a way to do that is to use the cornering equilibria, those associated to the systems with Betadot, Vdot and Psidotdot = 0
+# Once I have set them I can focus on the last three equation, then imposing Veq and PsidotEq (I can think of this also as Veq/R with R a certain imposed radious) we obtain Betaeq, Fxeq and Deltaeq, in alternative I can set Veq and Betaeq and as concequence find the other eqilibrium values.
 # The associated x and y trajectory can then be obtained by forward integration of the dynamics with the values we just found.
 # For vehicles these trajectories are called corering eqilibria, in which I have circles with some radious and some Veq.
 
@@ -71,7 +72,7 @@ B = fu.T
 x_traj = [x[0]]
 y_traj = [x[1]]
 
-total_time = 10  # Adjust the total simulation time as needed
+total_time = 10                     # Adjust the total simulation time as needed
 num_steps = int(total_time / dt)
 
 for _ in range(num_steps):
@@ -88,6 +89,7 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
+# Checking derivatives
 
 xx = np.zeros((ns,))
 ddx = np.zeros((ns,))
@@ -101,3 +103,15 @@ diff = xx_plus - x_plus
 check = diff - np.dot(fx,ddx)
 
 print (check)
+
+# Looking for Equilibria
+
+initial_guess = np.array([10, 0, 0, 1, 0, 0])
+
+def equilibrium_equations(z,u):
+    return dynamics(z,u)[0]
+
+equilibrium_state = fsolve(equilibrium_equations(x, u), initial_guess)
+
+for i in range (len(equilibrium_state)):
+    print("equilibrio:", equilibrium_state[i])
