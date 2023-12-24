@@ -133,4 +133,5 @@ solution = fsolve(equations, initial_guess)
 # Print the result
 print(f'Solution: {solution}')
 
+#prova
 
