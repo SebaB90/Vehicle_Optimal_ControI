@@ -34,12 +34,12 @@ def dynamics (x, u):
     Fz = [m*g*b/(a+b), m*g*a/(a+b)]             # Fz = [F_zf, F_zr]
     Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]   # Fy = [F_yf, F_yr]
 
-    x_plus[0] = x[0] + dt*(x[3] * np.cos(x[4]) * np.cos(x[2]) - x[3] * np.sin(x[4]) * np.sin(x[2]))                 # X dot
-    x_plus[1] = x[1] + dt*(x[3] * np.cos(x[4]) * np.sin(x[2]) + x[3] * np.sin(x[4]) * np.cos(x[2]))                 # Y dot
-    x_plus[2] = x[2] + dt*x[5]                                                                                      # Psi dot
-    x_plus[3] = x[3] + dt*((Fy[1] * np.sin(x[4]) + u[1] * np.cos(x[4] - u[0]) + Fy[0] * np.sin(x[4] - u[0]))/m)     # V dot
-    x_plus[4] = x[4] + dt*((Fy[1] * np.cos(x[4]) + Fy[0] * np.cos(x[4] - u[0]) - u[1] * np.sin(x[4] - u[0]))/(m * x[3]) - x[5])  # Beta dot
-    x_plus[5] = x[5] + dt*(((u[1] * np.sin(u[0]) + Fy[0] * np.cos(u[0])) * a - Fy[1] * b)/Iz)                       # Psi dot dot
+    x_plus[0] = x[0] + dt*(x[3] * np.cos(x[4]) * np.cos(x[2]) - x[3] * np.sin(x[4]) * np.sin(x[2]))                                 # X dot
+    x_plus[1] = x[1] + dt*(x[3] * np.cos(x[4]) * np.sin(x[2]) + x[3] * np.sin(x[4]) * np.cos(x[2]))                                 # Y dot
+    x_plus[2] = x[2] + dt*x[5]                                                                                                      # Psi dot
+    x_plus[3] = x[3] + dt*((Fy[1] * np.sin(x[4]) + u[1] * np.cos(x[4] - u[0]) + Fy[0] * np.sin(x[4] - u[0]))/m)                     # V dot
+    x_plus[4] = x[4] + dt*((Fy[1] * np.cos(x[4]) + Fy[0] * np.cos(x[4] - u[0]) - u[1] * np.sin(x[4] - u[0]))/(m * x[3]) - x[5])     # Beta dot
+    x_plus[5] = x[5] + dt*(((u[1] * np.sin(u[0]) + Fy[0] * np.cos(u[0])) * a - Fy[1] * b)/Iz)                                       # Psi dot dot
 
     fx = np.array([[1, 0, 0, 0, 0, 0],
                   [0, 1, 0, 0, 0, 0],
@@ -62,13 +62,15 @@ def dynamics (x, u):
 # For vehicles these trajectories are called corering eqilibria, in which I have circles with some radious and some Veq.
 
 u = np.array([0, 0])
-x = np.array([10, 0, 0, 1, 0, 0])
+x = np.array([0, 0, 0, 1, 0, 0])
 
 x_plus, fx, fu = dynamics(x, u)
 
 A = fx.T
 B = fu.T
 
+
+# OPEN LOOP TEST to check if the dynamics do what expected ---------------------------------------------------
 x_traj = [x[0]]
 y_traj = [x[1]]
 
@@ -91,6 +93,7 @@ plt.show()
 
 # Checking derivatives
 
+# CHECK IF THE DERIVATIVES ARE CORRECT ----------------------------------------------------------------------
 xx = np.zeros((ns,))
 ddx = np.zeros((ns,))
 
@@ -103,15 +106,3 @@ diff = xx_plus - x_plus
 check = diff - np.dot(fx,ddx)
 
 print (check)
-
-# Looking for Equilibria
-
-initial_guess = np.array([10, 0, 0, 1, 0, 0])
-
-def equilibrium_equations(z,u):
-    return dynamics(z,u)[0]
-
-equilibrium_state = fsolve(equilibrium_equations(x, u), initial_guess)
-
-for i in range (len(equilibrium_state)):
-    print("equilibrio:", equilibrium_state[i])
