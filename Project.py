@@ -48,7 +48,7 @@ def dynamics (x, u):
                   [dt*(-x[3] * np.sin(x[4]) * np.cos(x[2]) - x[3] * np.cos(x[4]) * np.sin(x[2])), dt*(-x[3] * np.sin(x[4]) * np.sin(x[2]) + x[3] * np.cos(x[4]) * np.cos(x[2])), 0, dt*((Fy[1] * np.cos(x[4]) - u[1] * np.sin(x[4] - u[0]) + Fy[0] * np.cos(x[4] - u[0]))/m), 1 + dt*((-Fy[1] * np.sin(x[4]) - Fy[0] * np.sin(x[4] - u[0]) - u[1] * np.cos(x[4] - u[0]))/(m * x[3])), 0],
                   [0, 0, dt, 0, -dt, 1]])
     
-    fu = np.array([[0, 0, 0, dt*(u[1] * np.sin(x[4] - u[0]) + Fy[0] * -np.cos(x[4] - u[0]))/m, dt*(Fy[0] * np.sin(x[4] - u[0]) + u[1] * np.cos(x[4] - u[0]))/(m * x[3]),  dt*((u[1] * np.cos(u[0]) - Fy[0] * np.sin(u[0])) *a/Iz)],
+    fu = np.array([[0, 0, 0, dt*(u[1] * np.sin(x[4] - u[0]) - Fy[0] * np.cos(x[4] - u[0]))/m, dt*(Fy[0] * np.sin(x[4] - u[0]) + u[1] * np.cos(x[4] - u[0]))/(m * x[3]),  dt*((u[1] * np.cos(u[0]) - Fy[0] * np.sin(u[0])) *a/Iz)],
                   [0, 0, 0, dt*np.cos(x[4] - u[0])/m, dt*(- np.sin(x[4] - u[0]))/(m * x[3]), dt * np.sin(u[0]) * a/Iz]])
 
     return x_plus, fx, fu
@@ -62,7 +62,7 @@ def dynamics (x, u):
 # For vehicles these trajectories are called corering eqilibria, in which I have circles with some radious and some Veq.
 
 u = np.array([0, 0])
-x = np.array([0, 0, 0, 1, 0, 0])
+x = np.array([0, 0, 0, 2, 0, 0])
 
 x_plus, fx, fu = dynamics(x, u)
 
@@ -78,9 +78,9 @@ total_time = 10                     # Adjust the total simulation time as needed
 num_steps = int(total_time / dt)
 
 for _ in range(num_steps):
-    x, _, _ = dynamics(x, u)
-    x_traj.append(x[0])
-    y_traj.append(x[1])
+    traj, _, _ = dynamics(x, u)
+    x_traj.append(traj[0])
+    y_traj.append(traj[1])
 
 # Plotting the trajectory
 plt.plot(x_traj, y_traj, label='Trajectory')
@@ -96,24 +96,36 @@ plt.show()
 # CHECK IF THE DERIVATIVES ARE CORRECT ----------------------------------------------------------------------
 xx = np.zeros((ns,))
 ddx = np.zeros((ns,))
+uu = np.zeros((ni,))
+ddu = np.zeros((ni,))
 
 for i in range (0,ns):
     ddx[i] = dx
 
+for k in range (0,ni):
+    ddu[k] = du
+
 xx = x + ddx
 xx_plus = dynamics(xx, u)[0]
-diff = xx_plus - x_plus
-check = diff - np.dot(fx,ddx)
+diff_x = xx_plus - x_plus
+check_x = diff_x - np.dot(A,ddx)
 
-print (check)
+uu = u + ddu
+xx_plus = dynamics(x, uu)[0]    # possibly wrong
+diff_u = xx_plus - x_plus       # possibly wrong
+check_u = diff_u - np.dot(B,ddu)
 
-# Evaluate the equilibrium
+print ('error in derivatives of x is:', check_x)
+print ('error in derivatives of u is:', check_u)
 
-# equilibriums
-                        
+
+# Evaluate the EQUILIBRIUM  ----------------------------------------------------------------------------------
+
+# imposed parameters                      
 x3=10
 x5=0
 
+# calculation of the other parameters
 def equations(vars):
     u0, u1, x4 = vars
     Beta = [u0 - (x3*np.sin(x4) + a*x5)/(x3*np.cos(x4)), - (x3*np.sin(x4) - b*x5)/(x3*np.cos(x4))]              # Beta = [Beta_f, Beta_r]
@@ -133,4 +145,4 @@ initial_guess = [1, 1, 1]
 solution = fsolve(equations, initial_guess)
 
 # Print the result
-print(f'Solution: {solution}')
+print(f'delta, Fx, beta at equilibrium given fixed V and yaw rate: {solution}')
