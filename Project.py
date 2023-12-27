@@ -61,8 +61,8 @@ def dynamics (x, u):
 # The associated x and y trajectory can then be obtained by forward integration of the dynamics with the values we just found.
 # For vehicles these trajectories are called corering eqilibria, in which I have circles with some radious and some Veq.
 
-u = np.array([0, 0])
-x = np.array([0, 0, 0, 2, 0, 0])
+u = np.array([0.25, 20])
+x = np.array([0, 0, 0, 1, 0, 0])
 
 x_plus, fx, fu = dynamics(x, u)
 
@@ -71,14 +71,15 @@ B = fu.T
 
 
 # OPEN LOOP TEST to check if the dynamics do what expected ---------------------------------------------------
-x_traj = [x[0]]
-y_traj = [x[1]]
+x_traj = [np.copy(x[0])]
+y_traj = [np.copy(x[1])]
+traj = np.copy(x)
 
-total_time = 10                     # Adjust the total simulation time as needed
+total_time = 100                     # Adjust the total simulation time as needed
 num_steps = int(total_time / dt)
 
 for _ in range(num_steps):
-    traj, _, _ = dynamics(x, u)
+    traj, _, _ = dynamics(traj, u)
     x_traj.append(traj[0])
     y_traj.append(traj[1])
 
@@ -121,28 +122,42 @@ print ('error in derivatives of u is:', check_u)
 
 # Evaluate the EQUILIBRIUM  ----------------------------------------------------------------------------------
 
-# imposed parameters                      
-x3=10
-x5=0
+# imposed parameters  
+
+eq = np.zeros((5, 2))                                  
 
 # calculation of the other parameters
 def equations(vars):
-    u0, u1, x4 = vars
+    x5, u0, u1 = vars
     Beta = [u0 - (x3*np.sin(x4) + a*x5)/(x3*np.cos(x4)), - (x3*np.sin(x4) - b*x5)/(x3*np.cos(x4))]              # Beta = [Beta_f, Beta_r]
     Fz = [m*g*b/(a+b), m*g*a/(a+b)]                                                                             # Fz = [F_zf, F_zr]
     Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                   # Fy = [F_yf, F_yr]
 
-    eq1 = (Fy[1] * np.sin(x4) + u1 * np.cos(x4 - u0) + Fy[0] * np.sin(x4 - u0))/m                       # V dot
-    eq2 = (Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - u0) - u1 * np.sin(x4 - u0))/(m * x3) - x5           # Beta dot
-    eq3 = ((u1 * np.sin(u0) + Fy[0] * np.cos(u0)) * a - Fy[1] * b)/Iz                                   # Psi dot dot
+    eq1 = (Fy[1] * np.sin(x4) + u1 * np.cos(x4 - u0) + Fy[0] * np.sin(x4 - u0))/m                               # V dot
+    eq2 = (Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - u0) - u1 * np.sin(x4 - u0))/(m * x3) - x5                   # Beta dot
+    eq3 = ((u1 * np.sin(u0) + Fy[0] * np.cos(u0)) * a - Fy[1] * b)/Iz                                           # Psi dot dot
 
     return [eq1, eq2, eq3]
 
 # Initial guess for the solution
-initial_guess = [1, 1, 1]
+initial_guess = [0.5, 0.1, 300]          # [x5(0), u0(0), u1(0)]
 
 # Use fsolve to find the solution
-solution = fsolve(equations, initial_guess)
+
+# FIRST EQUILIBRIUM
+x3 = 7                  
+x4 = 0 
+eq[0,0] = np.copy(x3)
+eq[1,0] = np.copy(x4)
+eq[2:,0] = fsolve(equations, initial_guess)
+
+
+# SECOND EQUILIBRIUM
+x3 = 5                  
+x4 = 0.25 
+eq[0,1] = np.copy(x3)
+eq[1,1] = np.copy(x4)
+eq[2:,1] = fsolve(equations, initial_guess)
 
 # Print the result
-print(f'delta, Fx, beta at equilibrium given fixed V and yaw rate: {solution}')
+print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
