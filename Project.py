@@ -224,3 +224,21 @@ fig.align_ylabels(axs)
 
 plt.show()
 
+
+##############################
+# TCreate a smoother trajectory
+##############################
+
+# Perform linear interpolation for traj_ref[0]
+new_num_points = 5  # Adjust the number of points for a smoother curve
+interp_indices = np.linspace(0, TT - 1, new_num_points)
+new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[0, :])
+
+# Plot the original traj_ref and the new trajectory for traj_ref[0]
+plt.plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original traj_ref[0]')
+plt.plot(interp_indices, new_traj_ref_0, '--', linewidth=2, label='Interpolated traj_ref[0]')
+plt.grid()
+plt.xlabel('time')
+plt.ylabel('$x_3$')
+plt.legend()
+plt.show()
