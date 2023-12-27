@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 
 
+##################################
 ##### TASK 0: DISCRETIZATION #####
+##################################
 
 
 #define params
@@ -55,14 +57,7 @@ def dynamics (x, u):
 
     return x_plus, fx, fu
 
-
-##### TASK 1: TRAJECTORY GENERATION #####
-
-# We have to find the eqilibria for the system, a way to do that is to use the cornering equilibria, those associated to the systems with Betadot, Vdot and Psidotdot = 0
-# Once I have set them I can focus on the last three equation, then imposing Veq and PsidotEq (I can think of this also as Veq/R with R a certain imposed radious) we obtain Betaeq, Fxeq and Deltaeq, in alternative I can set Veq and Betaeq and as concequence find the other eqilibrium values.
-# The associated x and y trajectory can then be obtained by forward integration of the dynamics with the values we just found.
-# For vehicles these trajectories are called corering eqilibria, in which I have circles with some radious and some Veq.
-
+# defining x and u
 u = np.array([0.25, 20])
 x = np.array([0, 0, 0, 1, 0, 0])
 
@@ -71,8 +66,8 @@ x_plus, fx, fu = dynamics(x, u)
 A = fx.T
 B = fu.T
 
-
 # OPEN LOOP TEST to check if the dynamics do what expected ---------------------------------------------------
+
 x_traj = [np.copy(x[0])]
 y_traj = [np.copy(x[1])]
 traj = np.copy(x)
@@ -97,6 +92,7 @@ plt.show()
 # Checking derivatives
 
 # CHECK IF THE DERIVATIVES ARE CORRECT ----------------------------------------------------------------------
+
 xx = np.zeros((ns,))
 ddx = np.zeros((ns,))
 uu = np.zeros((ni,))
@@ -121,6 +117,15 @@ check_u = diff_u - np.dot(B,ddu)
 print ('error in derivatives of x is:', check_x)
 print ('error in derivatives of u is:', check_u)
 
+
+#########################################
+##### TASK 1: TRAJECTORY GENERATION #####
+#########################################
+
+# We have to find the eqilibria for the system, a way to do that is to use the cornering equilibria, those associated to the systems with Betadot, Vdot and Psidotdot = 0
+# Once I have set them I can focus on the last three equation, then imposing Veq and PsidotEq (I can think of this also as Veq/R with R a certain imposed radious) we obtain Betaeq, Fxeq and Deltaeq, in alternative I can set Veq and Betaeq and as concequence find the other eqilibrium values.
+# The associated x and y trajectory can then be obtained by forward integration of the dynamics with the values we just found.
+# For vehicles these trajectories are called corering eqilibria, in which I have circles with some radious and some Veq.
 
 # Evaluate the EQUILIBRIUM  ----------------------------------------------------------------------------------
 
@@ -163,6 +168,7 @@ eq[2:,1] = fsolve(equations, initial_guess)
 
 # Print the result
 print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
+
 
 # Design REFERENCE TRAJECTORY  ---------------------------------------------------------------------------------------
 
@@ -220,7 +226,6 @@ fig.align_ylabels(axs)
 
 plt.show()
 
-
 # smoothing the reference trajectory 
 
 # Perform linear interpolation for traj_ref[0]
@@ -236,3 +241,6 @@ plt.xlabel('time')
 plt.ylabel('$x_3$')
 plt.legend()
 plt.show()
+
+# GRADIENT METHOD evaluation  ----------------------------------------------------------------------------------------
+
