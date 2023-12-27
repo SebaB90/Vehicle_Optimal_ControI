@@ -6,8 +6,10 @@
 #
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
+
 
 ##### TASK 0: DISCRETIZATION #####
 
@@ -161,3 +163,64 @@ eq[2:,1] = fsolve(equations, initial_guess)
 
 # Print the result
 print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
+
+
+
+##############################
+# Reference trajectory
+##############################
+
+TT = int(5.e1)
+traj_ref = np.zeros((eq.shape[0], TT))
+
+# Step reference signal - for all the states
+T_mid = int((TT/2))
+
+for tt in range(TT):
+  if tt < T_mid:
+    traj_ref[0, tt] = eq[0,0] 
+    traj_ref[1, tt] = eq[1,0] 
+    traj_ref[2, tt] = eq[2,0] 
+    traj_ref[3, tt] = eq[3,0]
+    traj_ref[4, tt] = eq[4,0]
+  else:
+    traj_ref[0, tt] = eq[0,1]
+    traj_ref[1, tt] = eq[1,1] 
+    traj_ref[2, tt] = eq[2,1]
+    traj_ref[3, tt] = eq[3,1]
+    traj_ref[4, tt] = eq[4,1]
+
+tt_hor = range(TT)
+
+fig, axs = plt.subplots(5, 1, sharex='all')
+
+axs[0].plot(tt_hor, traj_ref[0,:], 'g--', linewidth=2)
+#axs[0].plot(tt_hor, xx[0,:], linewidth=2)
+axs[0].grid()
+axs[0].set_ylabel('$x_3$')
+
+axs[1].plot(tt_hor, traj_ref[1,:], 'g--', linewidth=2)
+#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[1].grid()
+axs[1].set_ylabel('$x_4$')
+
+axs[2].plot(tt_hor, traj_ref[2,:], 'g--', linewidth=2)
+#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[2].grid()
+axs[2].set_ylabel('$x_5$')
+
+axs[3].plot(tt_hor, traj_ref[3,:], 'g--', linewidth=2)
+#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[3].grid()
+axs[3].set_ylabel('$u_0$')
+
+axs[4].plot(tt_hor, traj_ref[4,:], 'g--', linewidth=2)
+#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[4].grid()
+axs[4].set_ylabel('$u_1$')
+axs[4].set_xlabel('time')
+
+fig.align_ylabels(axs)
+
+plt.show()
+
