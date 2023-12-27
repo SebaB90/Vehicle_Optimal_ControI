@@ -226,7 +226,7 @@ fig.align_ylabels(axs)
 
 plt.show()
 
-# smoothing the reference trajectory 
+# SMOOTHING the reference trajectory  -----------------------------------------------------------------------------------
 
 # Perform linear interpolation for traj_ref[0]
 new_num_points = 5  # Adjust the number of points for a smoother curve
@@ -243,4 +243,5 @@ plt.legend()
 plt.show()
 
 # GRADIENT METHOD evaluation  ----------------------------------------------------------------------------------------
+
 
