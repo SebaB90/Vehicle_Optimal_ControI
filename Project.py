@@ -164,11 +164,7 @@ eq[2:,1] = fsolve(equations, initial_guess)
 # Print the result
 print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
 
-
-
-##############################
-# Reference trajectory
-##############################
+# Design REFERENCE TRAJECTORY  ---------------------------------------------------------------------------------------
 
 TT = int(5.e1)
 traj_ref = np.zeros((eq.shape[0], TT))
@@ -225,9 +221,7 @@ fig.align_ylabels(axs)
 plt.show()
 
 
-##############################
-# TCreate a smoother trajectory
-##############################
+# smoothing the reference trajectory 
 
 # Perform linear interpolation for traj_ref[0]
 new_num_points = 5  # Adjust the number of points for a smoother curve
