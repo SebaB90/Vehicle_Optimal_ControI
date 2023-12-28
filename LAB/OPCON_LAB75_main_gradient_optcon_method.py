@@ -31,7 +31,7 @@ plt.rcParams.update({'font.size': 22})
 # Algorithm parameters
 #######################################
 
-max_iters = int(3e2)
+max_iters = int(10)
 stepsize_0 = 1
 
 # ARMIJO PARAMETERS
@@ -42,8 +42,8 @@ armijo_maxiters = 20 # number of Armijo iterations
 
 term_cond = 1e-6
 
-visu_armijo = False
-visu_animation = False
+visu_armijo = True
+visu_animation = True
 
 #######################################
 # Trajectory parameters
@@ -155,6 +155,8 @@ kk = 0
 
 xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
+
+print(np.shape(xx), np.shape(xx_ref))
 
 for kk in range(max_iters-1):
 

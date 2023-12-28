@@ -23,6 +23,13 @@ dx = 1e-3   #infinitesimal increment
 du = 1e-3   #infinitesimal increment
 ns = 6      #number of states
 ni = 2      #number of inputs
+max_iters = int(3e2)    #maximum number of iterations for Newton's method
+
+
+# ARMIJO PARAMETERS
+cc = 0.5
+beta = 0.7
+armijo_maxiters = 20 # number of Armijo iterations
 
 m = 1480    #Kg
 Iz = 1950   #Kg*m^2
@@ -93,9 +100,9 @@ plt.show()
 
 # CHECK IF THE DERIVATIVES ARE CORRECT ----------------------------------------------------------------------
 
-xx = np.zeros((ns,))
+xdx = np.zeros((ns,))
 ddx = np.zeros((ns,))
-uu = np.zeros((ni,))
+udu = np.zeros((ni,))
 ddu = np.zeros((ni,))
 
 for i in range (0,ns):
@@ -104,13 +111,13 @@ for i in range (0,ns):
 for k in range (0,ni):
     ddu[k] = du
 
-xx = x + ddx
-xx_plus = dynamics(xx, u)[0]
+xdx = x + ddx
+xx_plus = dynamics(xdx, u)[0]
 diff_x = xx_plus - x_plus
 check_x = diff_x - np.dot(A,ddx)
 
-uu = u + ddu
-xx_plus = dynamics(x, uu)[0]    
+udu = u + ddu
+xx_plus = dynamics(x, udu)[0]    
 diff_u = xx_plus - x_plus      
 check_u = diff_u - np.dot(B,ddu)
 
@@ -244,4 +251,179 @@ plt.show()
 
 # GRADIENT METHOD evaluation  ----------------------------------------------------------------------------------------
 
+# Define a cost function
 
+
+Q = np.diag([1.0, 1.0, 1.0])
+Q_f = np.array([[1, 0], [0, 1]])
+
+r = 0.5
+R = r*np.eye(ni)
+
+QT = Q
+
+def cost(xx,uu, xx_ref, uu_ref):
+    """
+    Stage-cost 
+
+    Quadratic cost function 
+    l(x,u) = 1/2 (x - x_ref)^T Q (x - x_ref) + 1/2 (u - u_ref)^T R (u - u_ref)
+
+    Args
+    - xx \in \R^2 state at time t
+    - xx_ref \in \R^2 state reference at time t
+
+    - uu \in \R^1 input at time t
+    - uu_ref \in \R^2 input reference at time t
+
+
+    Return 
+    - cost at xx,uu
+    - gradient of l wrt x, at xx,uu
+    - gradient of l wrt u, at xx,uu
+
+    """
+
+    xx = xx[:,None]
+    uu = uu[:,None]
+
+    xx_ref = xx_ref[:,None]
+    uu_ref = uu_ref[:,None]
+
+    l = 0.5*(xx - xx_ref).T@Q@(xx - xx_ref) + 0.5*(uu - uu_ref).T@R@(uu - uu_ref)
+
+    lx = Q@(xx - xx_ref)
+    lu = R@(uu - uu_ref)
+
+    return l.squeeze(), lx, lu
+
+def cost_f(xx,xx_ref):
+    """
+    Terminal-cost
+
+    Quadratic cost function l_T(x) = 1/2 (x - x_ref)^T Q_T (x - x_ref)
+
+    Args
+        - xx \in \R^2 state at time t
+        - xx_ref \in \R^2 state reference at time t
+
+    Return 
+        - cost at xx,uu
+        - gradient of l wrt x, at xx,uu
+        - gradient of l wrt u, at xx,uu
+
+    """
+    xx = xx[:,None]
+    xx_ref = xx_ref[:,None]
+
+    lT = 0.5*(xx - xx_ref).T@QT@(xx - xx_ref)
+
+    lTx = QT@(xx - xx_ref)
+
+    return lT.squeeze(), lTx
+
+# arrays to store data
+xx = np.zeros((3, TT, max_iters))   # state seq.
+uu = np.zeros((2, TT, max_iters))   # input seq.
+xx_ref = np.zeros((3, TT))          # state ref.
+uu_ref = np.zeros((2, TT))          # input ref.
+
+lmbd = np.zeros((3, TT, max_iters))    # lambdas - costate seq.
+
+deltau = np.zeros((2,TT, max_iters))   # Du - descent direction
+dJ = np.zeros((2,TT, max_iters))       # DJ - gradient of J wrt u
+
+JJ = np.zeros(max_iters)                # collect cost
+descent = np.zeros(max_iters)           # collect descent direction
+descent_arm = np.zeros(max_iters)       # collect descent direction
+
+# initial conditions
+xx_init = np.zeros((3, TT))
+uu_init = np.zeros((2, TT))
+
+xx_ref = traj_ref[0:3]
+uu_ref = traj_ref[3:]
+
+xx[:,:,0] = xx_init
+uu[:,:,0] = uu_init
+
+print(np.shape(xx), np.shape(xx_ref))
+
+for kk in range(max_iters-1):
+
+    JJ[kk] = 0
+
+    # calculate cost
+    for tt in range(TT-1):
+        temp_cost = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[0]
+        JJ[kk] += temp_cost
+
+        temp_cost = cost_f(xx[:,-1,kk], xx_ref[:,-1])[0]
+        JJ[kk] += temp_cost
+
+    # Descent direction calculation
+    lmbd_temp = cost_f(xx[:,TT-1,kk], xx_ref[:,TT-1])[1]
+    lmbd[:,TT-1,kk] = lmbd_temp.squeeze()
+
+    for tt in reversed(range(TT-1)):                        # integration backward in time
+
+        at, bt = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[1:]
+        fx, fu = dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
+
+        At = fx.T
+        Bt = fu.T
+
+        lmbd_temp = At.T@lmbd[:,tt+1,kk][:,None] + at       # costate equation
+        dJ_temp = Bt.T@lmbd[:,tt+1,kk][:,None] + bt         # gradient of J wrt u
+        deltau_temp = - dJ_temp
+
+        lmbd[:,tt,kk] = lmbd_temp.squeeze()
+        dJ[:,tt,kk] = dJ_temp.squeeze()
+        deltau[:,tt,kk] = deltau_temp.squeeze()
+
+        descent[kk] += deltau[:,tt,kk].T@deltau[:,tt,kk]
+        descent_arm[kk] += dJ[:,tt,kk].T@deltau[:,tt,kk]
+
+    # Stepsize selection - ARMIJO
+    stepsizes = []  # list of stepsizes
+    costs_armijo = []
+
+    stepsize = 1
+
+    for ii in range(armijo_maxiters):
+
+        # temp solution update
+
+        xx_temp = np.zeros((ns,TT))
+        uu_temp = np.zeros((ni,TT))
+
+        xx_temp[:,0] = xx_ref[:,0]
+
+        for tt in range(TT-1):
+            uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
+            xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+
+        # temp cost calculation
+        JJ_temp = 0
+
+        for tt in range(TT-1):
+            temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt])[0]
+            JJ_temp += temp_cost
+
+        temp_cost = cost_f(xx_temp[:,-1], xx_ref[:,-1])[0]
+        JJ_temp += temp_cost
+
+        stepsizes.append(stepsize)                              # save the stepsize
+        costs_armijo.append(np.min([JJ_temp, 100*JJ[kk]]))      # save the cost associated to the stepsize
+
+        if JJ_temp > JJ[kk]  + cc*stepsize*descent_arm[kk]:
+            # update the stepsize
+            stepsize = beta*stepsize
+        
+        else:
+            print('Armijo stepsize = {:.3e}'.format(stepsize))
+            break
+
+
+
+print(JJ)
