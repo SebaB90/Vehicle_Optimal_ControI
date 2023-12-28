@@ -110,8 +110,8 @@ diff_x = xx_plus - x_plus
 check_x = diff_x - np.dot(A,ddx)
 
 uu = u + ddu
-xx_plus = dynamics(x, uu)[0]    # possibly wrong
-diff_u = xx_plus - x_plus       # possibly wrong
+xx_plus = dynamics(x, uu)[0]    
+diff_u = xx_plus - x_plus      
 check_u = diff_u - np.dot(B,ddu)
 
 print ('error in derivatives of x is:', check_x)
