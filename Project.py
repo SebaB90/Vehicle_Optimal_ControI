@@ -24,6 +24,8 @@ du = 1e-3   #infinitesimal increment
 ns = 6      #number of states
 ni = 2      #number of inputs
 max_iters = int(3e2)    #maximum number of iterations for Newton's method
+TT = int(5.e1)          #simulation time
+T_mid = TT/2            #half time
 
 
 # ARMIJO PARAMETERS
@@ -138,9 +140,9 @@ print ('error in derivatives of u is:', check_u)
 
 # imposed parameters  
 
-eq = np.zeros((5, 2))                                  
+eq = np.zeros((ns+ni, 2))                                  
 
-# calculation of the other parameters
+# calculation of the parameters at equilibrium
 def equations(vars):
     x5, u0, u1 = vars
     Beta = [u0 - (x3*np.sin(x4) + a*x5)/(x3*np.cos(x4)), - (x3*np.sin(x4) - b*x5)/(x3*np.cos(x4))]              # Beta = [Beta_f, Beta_r]
@@ -156,30 +158,71 @@ def equations(vars):
 # Initial guess for the solution
 initial_guess = [0.5, 0.1, 300]          # [x5(0), u0(0), u1(0)]
 
+'''
+u = np.array([eq[3,0], eq[4,0]])
+x = np.array([0, 0, 0, eq[0,0], eq[1,0], eq[2,0]])
+
+x_traj = [np.copy(x[0])]
+y_traj = [np.copy(x[1])]
+psi_traj = [np.copy(x[2])]
+traj = np.copy(x)
+
+num_steps = int(T_mid / dt)
+
+for _ in range(num_steps):
+    traj, _, _ = dynamics(traj, u)
+    x_traj.append(traj[0])
+    y_traj.append(traj[1])
+    psi_traj.append(traj[2])
+
+u = np.array([eq[3,1], eq[4,1]])
+x = np.array([x_traj[-1], y_traj[-1], psi_traj[-1], eq[0,1], eq[1,1], eq[2,1]])
+traj = np.copy(x)
+
+num_steps = int(T_mid / dt)
+
+for _ in range(num_steps):
+    traj, _, _ = dynamics(traj, u)
+    x_traj.append(traj[0])
+    y_traj.append(traj[1])
+    psi_traj.append(traj[2])
+
+x0 = x_traj[-1]
+x1 = y_traj[-1]
+x2 = psi_traj[-1]
+'''
+
 # Use fsolve to find the solution
 
 # FIRST EQUILIBRIUM
 x3 = 7                  
 x4 = 0 
-eq[0,0] = np.copy(x3)
-eq[1,0] = np.copy(x4)
-eq[2:,0] = fsolve(equations, initial_guess)
 
+eq[2,0] = 0                                     # psi
+eq[3,0] = np.copy(x3)                           # V
+eq[4,0] = np.copy(x4)                           # beta
+eq[5:,0] = fsolve(equations, initial_guess)     # psi dot
+eq[0,0]=(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*T_mid     # x
+eq[1,0]=(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
 
 # SECOND EQUILIBRIUM
 x3 = 5                  
 x4 = 0.25 
-eq[0,1] = np.copy(x3)
-eq[1,1] = np.copy(x4)
-eq[2:,1] = fsolve(equations, initial_guess)
+
+eq[2,1] = 20                                    
+eq[3,1] = np.copy(x3)
+eq[4,1] = np.copy(x4)
+eq[5:,1] = fsolve(equations, initial_guess)
+eq[0,1]= eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*T_mid
+eq[1,1]= eq[1,0] + (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,1])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,1]))*T_mid
 
 # Print the result
 print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
 
 
+
 # Design REFERENCE TRAJECTORY  ---------------------------------------------------------------------------------------
 
-TT = int(5.e1)
 traj_ref = np.zeros((eq.shape[0], TT))
 
 # Step reference signal - for all the states
@@ -192,61 +235,67 @@ for tt in range(TT):
     traj_ref[2, tt] = eq[2,0] 
     traj_ref[3, tt] = eq[3,0]
     traj_ref[4, tt] = eq[4,0]
+    traj_ref[5, tt] = eq[5,0] 
+    traj_ref[6, tt] = eq[6,0]
+    traj_ref[7, tt] = eq[7,0]
+
   else:
     traj_ref[0, tt] = eq[0,1]
     traj_ref[1, tt] = eq[1,1] 
     traj_ref[2, tt] = eq[2,1]
     traj_ref[3, tt] = eq[3,1]
     traj_ref[4, tt] = eq[4,1]
+    traj_ref[5, tt] = eq[5,1]
+    traj_ref[6, tt] = eq[6,1]
+    traj_ref[7, tt] = eq[7,1]
 
 tt_hor = range(TT)
 
-fig, axs = plt.subplots(5, 1, sharex='all')
+fig, axs = plt.subplots(8, 1, sharex='all')
 
 axs[0].plot(tt_hor, traj_ref[0,:], 'g--', linewidth=2)
 #axs[0].plot(tt_hor, xx[0,:], linewidth=2)
 axs[0].grid()
-axs[0].set_ylabel('$x_3$')
+axs[0].set_ylabel('$x$')
 
 axs[1].plot(tt_hor, traj_ref[1,:], 'g--', linewidth=2)
 #axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[1].grid()
-axs[1].set_ylabel('$x_4$')
+axs[1].set_ylabel('$y$')
 
 axs[2].plot(tt_hor, traj_ref[2,:], 'g--', linewidth=2)
 #axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[2].grid()
-axs[2].set_ylabel('$x_5$')
+axs[2].set_ylabel('$psi$')
 
 axs[3].plot(tt_hor, traj_ref[3,:], 'g--', linewidth=2)
 #axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[3].grid()
-axs[3].set_ylabel('$u_0$')
+axs[3].set_ylabel('$V$')
 
 axs[4].plot(tt_hor, traj_ref[4,:], 'g--', linewidth=2)
 #axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[4].grid()
-axs[4].set_ylabel('$u_1$')
-axs[4].set_xlabel('time')
+axs[4].set_ylabel('$beta$')
+
+axs[5].plot(tt_hor, traj_ref[5,:], 'g--', linewidth=2)
+#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[5].grid()
+axs[5].set_ylabel('$psi dot$')
+
+axs[6].plot(tt_hor, traj_ref[6,:], 'g--', linewidth=2)
+#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[6].grid()
+axs[6].set_ylabel('$u_0$')
+
+axs[7].plot(tt_hor, traj_ref[7,:], 'g--', linewidth=2)
+#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[7].grid()
+axs[7].set_ylabel('$u_1$')
+axs[7].set_xlabel('time')
 
 fig.align_ylabels(axs)
 
-plt.show()
-
-# SMOOTHING the reference trajectory  -----------------------------------------------------------------------------------
-
-# Perform linear interpolation for traj_ref[0]
-new_num_points = 5  # Adjust the number of points for a smoother curve
-interp_indices = np.linspace(0, TT - 1, new_num_points)
-new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[0, :])
-
-# Plot the original traj_ref and the new trajectory for traj_ref[0]
-plt.plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original traj_ref[0]')
-plt.plot(interp_indices, new_traj_ref_0, '--', linewidth=2, label='Interpolated traj_ref[0]')
-plt.grid()
-plt.xlabel('time')
-plt.ylabel('$x_3$')
-plt.legend()
 plt.show()
 
 # GRADIENT METHOD evaluation  ----------------------------------------------------------------------------------------
@@ -254,13 +303,12 @@ plt.show()
 # Define a cost function
 
 
-Q = np.diag([1.0, 1.0, 1.0])
-Q_f = np.array([[1, 0], [0, 1]])
+Q = np.diag([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+QT = Q
 
 r = 0.5
 R = r*np.eye(ni)
 
-QT = Q
 
 def cost(xx,uu, xx_ref, uu_ref):
     """
@@ -323,26 +371,27 @@ def cost_f(xx,xx_ref):
     return lT.squeeze(), lTx
 
 # arrays to store data
-xx = np.zeros((3, TT, max_iters))   # state seq.
-uu = np.zeros((2, TT, max_iters))   # input seq.
-xx_ref = np.zeros((3, TT))          # state ref.
-uu_ref = np.zeros((2, TT))          # input ref.
+xx = np.zeros((ns, TT, max_iters))   # state seq.
+uu = np.zeros((ni, TT, max_iters))   # input seq.
+xx_ref = np.zeros((ns, TT))          # state ref.
+uu_ref = np.zeros((ni, TT))          # input ref.
 
-lmbd = np.zeros((3, TT, max_iters))    # lambdas - costate seq.
+lmbd = np.zeros((ns, TT, max_iters))    # lambdas - costate seq.
 
-deltau = np.zeros((2,TT, max_iters))   # Du - descent direction
-dJ = np.zeros((2,TT, max_iters))       # DJ - gradient of J wrt u
+deltau = np.zeros((ni,TT, max_iters))   # Du - descent direction
+dJ = np.zeros((ni,TT, max_iters))       # DJ - gradient of J wrt u
 
 JJ = np.zeros(max_iters)                # collect cost
 descent = np.zeros(max_iters)           # collect descent direction
 descent_arm = np.zeros(max_iters)       # collect descent direction
 
 # initial conditions
-xx_init = np.zeros((3, TT))
-uu_init = np.zeros((2, TT))
+xx_init = np.zeros((ns, TT))
+xx_init[3,:] = 1
+uu_init = np.zeros((ni, TT))
 
-xx_ref = traj_ref[0:3]
-uu_ref = traj_ref[3:]
+xx_ref = traj_ref[0:6]
+uu_ref = traj_ref[6:]
 
 xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
@@ -425,5 +474,23 @@ for kk in range(max_iters-1):
             break
 
 
-
 print(JJ)
+
+
+'''
+# SMOOTHING the reference trajectory  -----------------------------------------------------------------------------------
+
+# Perform linear interpolation for traj_ref[0]
+new_num_points = 5  # Adjust the number of points for a smoother curve
+interp_indices = np.linspace(0, TT - 1, new_num_points)
+new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[0, :])
+
+# Plot the original traj_ref and the new trajectory for traj_ref[0]
+plt.plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original traj_ref[0]')
+plt.plot(interp_indices, new_traj_ref_0, '--', linewidth=2, label='Interpolated traj_ref[0]')
+plt.grid()
+plt.xlabel('time')
+plt.ylabel('$x_3$')
+plt.legend()
+plt.show()
+'''
