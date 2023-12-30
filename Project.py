@@ -10,6 +10,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 
+# Allow Ctrl-C to work despite plotting
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 ##################################
 ##### TASK 0: DISCRETIZATION #####
@@ -23,9 +26,11 @@ dx = 1e-3   #infinitesimal increment
 du = 1e-3   #infinitesimal increment
 ns = 6      #number of states
 ni = 2      #number of inputs
-max_iters = int(3e2)    #maximum number of iterations for Newton's method
-TT = int(5.e1)          #simulation time
+max_iters = 30 # int(3e2)    #maximum number of iterations for Newton's method
+
+TT = int(5.e2)         #discrete time samples
 T_mid = TT/2            #half time
+term_cond = 1e-6        #terminal condition
 
 
 # ARMIJO PARAMETERS
@@ -158,40 +163,6 @@ def equations(vars):
 # Initial guess for the solution
 initial_guess = [0.5, 0.1, 300]          # [x5(0), u0(0), u1(0)]
 
-'''
-u = np.array([eq[3,0], eq[4,0]])
-x = np.array([0, 0, 0, eq[0,0], eq[1,0], eq[2,0]])
-
-x_traj = [np.copy(x[0])]
-y_traj = [np.copy(x[1])]
-psi_traj = [np.copy(x[2])]
-traj = np.copy(x)
-
-num_steps = int(T_mid / dt)
-
-for _ in range(num_steps):
-    traj, _, _ = dynamics(traj, u)
-    x_traj.append(traj[0])
-    y_traj.append(traj[1])
-    psi_traj.append(traj[2])
-
-u = np.array([eq[3,1], eq[4,1]])
-x = np.array([x_traj[-1], y_traj[-1], psi_traj[-1], eq[0,1], eq[1,1], eq[2,1]])
-traj = np.copy(x)
-
-num_steps = int(T_mid / dt)
-
-for _ in range(num_steps):
-    traj, _, _ = dynamics(traj, u)
-    x_traj.append(traj[0])
-    y_traj.append(traj[1])
-    psi_traj.append(traj[2])
-
-x0 = x_traj[-1]
-x1 = y_traj[-1]
-x2 = psi_traj[-1]
-'''
-
 # Use fsolve to find the solution
 
 # FIRST EQUILIBRIUM
@@ -201,13 +172,13 @@ x4 = 0
 eq[2,0] = 0                                     # psi
 eq[3,0] = np.copy(x3)                           # V
 eq[4,0] = np.copy(x4)                           # beta
-eq[5:,0] = fsolve(equations, initial_guess)     # psi dot
+eq[5:,0] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
 eq[0,0]=(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*T_mid     # x
 eq[1,0]=(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
 
 # SECOND EQUILIBRIUM
 x3 = 5                  
-x4 = 0.25 
+x4 = 0.1 
 
 eq[2,1] = 20                                    
 eq[3,1] = np.copy(x3)
@@ -218,7 +189,6 @@ eq[1,1]= eq[1,0] + (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,1])+eq[3,0]*np.sin(eq[4,
 
 # Print the result
 print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
-
 
 
 # Design REFERENCE TRAJECTORY  ---------------------------------------------------------------------------------------
@@ -254,42 +224,34 @@ tt_hor = range(TT)
 fig, axs = plt.subplots(8, 1, sharex='all')
 
 axs[0].plot(tt_hor, traj_ref[0,:], 'g--', linewidth=2)
-#axs[0].plot(tt_hor, xx[0,:], linewidth=2)
 axs[0].grid()
 axs[0].set_ylabel('$x$')
 
 axs[1].plot(tt_hor, traj_ref[1,:], 'g--', linewidth=2)
-#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[1].grid()
 axs[1].set_ylabel('$y$')
 
 axs[2].plot(tt_hor, traj_ref[2,:], 'g--', linewidth=2)
-#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[2].grid()
 axs[2].set_ylabel('$psi$')
 
 axs[3].plot(tt_hor, traj_ref[3,:], 'g--', linewidth=2)
-#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[3].grid()
 axs[3].set_ylabel('$V$')
 
 axs[4].plot(tt_hor, traj_ref[4,:], 'g--', linewidth=2)
-#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[4].grid()
 axs[4].set_ylabel('$beta$')
 
 axs[5].plot(tt_hor, traj_ref[5,:], 'g--', linewidth=2)
-#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[5].grid()
 axs[5].set_ylabel('$psi dot$')
 
 axs[6].plot(tt_hor, traj_ref[6,:], 'g--', linewidth=2)
-#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[6].grid()
 axs[6].set_ylabel('$u_0$')
 
 axs[7].plot(tt_hor, traj_ref[7,:], 'g--', linewidth=2)
-#axs[1].plot(tt_hor, xx[1,:], linewidth=2)
 axs[7].grid()
 axs[7].set_ylabel('$u_1$')
 axs[7].set_xlabel('time')
@@ -302,12 +264,10 @@ plt.show()
 
 # Define a cost function
 
-
 Q = np.diag([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 QT = Q
 
-r = 0.5
-R = r*np.eye(ni)
+R =  np.diag([0.5, 0.5])
 
 
 def cost(xx,uu, xx_ref, uu_ref):
@@ -396,8 +356,6 @@ uu_ref = traj_ref[6:]
 xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
 
-print(np.shape(xx), np.shape(xx_ref))
-
 for kk in range(max_iters-1):
 
     JJ[kk] = 0
@@ -470,14 +428,149 @@ for kk in range(max_iters-1):
             stepsize = beta*stepsize
         
         else:
-            print('Armijo stepsize = {:.3e}'.format(stepsize))
+            # print('Armijo stepsize = {:.3e}'.format(stepsize))
             break
 
+    # Armijo plot
 
-print(JJ)
+    steps = np.linspace(0,1,int(2e1))
+    costs = np.zeros(len(steps))
+
+    for ii in range(len(steps)):
+
+        step = steps[ii]
+
+        # temp solution update
+
+        xx_temp = np.zeros((ns,TT))
+        uu_temp = np.zeros((ni,TT))
+
+        xx_temp[:,0] = xx_ref[:,0]
+
+        for tt in range(TT-1):
+            uu_temp[:,tt] = uu[:,tt,kk] + step*deltau[:,tt,kk]
+            xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+
+        # temp cost calculation
+        JJ_temp = 0
+
+        for tt in range(TT-1):
+            temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt])[0]
+            JJ_temp += temp_cost
+
+        temp_cost = cost_f(xx_temp[:,-1], xx_ref[:,-1])[0]
+        JJ_temp += temp_cost
+
+        costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
 
 
-'''
+    plt.figure(1)
+    plt.clf()
+
+    plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')
+    plt.plot(steps, JJ[kk] + descent_arm[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+    # plt.plot(steps, JJ[kk] - descent[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+    plt.plot(steps, JJ[kk] + cc*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$J(\\mathbf{u}^k) - stepsize*c*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+    plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
+    plt.grid()
+    plt.xlabel('stepsize')
+    plt.legend()
+    plt.draw()
+    plt.show()
+
+    # Update the current solution
+
+    xx_temp = np.zeros((ns,TT))
+    uu_temp = np.zeros((ni,TT))
+
+    xx_temp[:,0] = xx_ref[:,0]
+
+    for tt in range(TT-1):
+        uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
+        xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+
+    xx[:,:,kk+1] = xx_temp
+    uu[:,:,kk+1] = uu_temp
+
+    # Termination condition
+
+    print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,descent[kk], JJ[kk]))
+
+    if descent[kk] <= term_cond:
+
+        max_iters = kk
+        break
+
+xx_star = xx[:,:,max_iters-1]
+uu_star = uu[:,:,max_iters-1]
+uu_star[:,-1] = uu_star[:,-2] # for plotting purposes
+
+# Plots
+
+plt.figure('descent direction')
+plt.plot(np.arange(max_iters), descent[:max_iters])
+plt.xlabel('$k$')
+plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
+plt.yscale('log')
+plt.grid()
+plt.show(block=False)
+
+plt.figure('cost')
+plt.plot(np.arange(max_iters), JJ[:max_iters])
+plt.xlabel('$k$')
+plt.ylabel('$J(\\mathbf{u}^k)$')
+plt.yscale('log')
+plt.grid()
+plt.show(block=False)
+
+
+# optimal trajectory
+
+fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+
+axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
+axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
+axs[0].grid()
+axs[0].set_ylabel('$x$')
+
+axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
+axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
+axs[1].grid()
+axs[1].set_ylabel('$y$')
+
+axs[2].plot(tt_hor, xx_star[2,:],'r', linewidth=2)
+axs[2].plot(tt_hor, xx_ref[2,:], 'r--', linewidth=2)
+axs[2].grid()
+axs[2].set_ylabel('$psi$')
+
+axs[3].plot(tt_hor, xx_star[3,:], linewidth=2)
+axs[3].plot(tt_hor, xx_ref[3,:], 'g--', linewidth=2)
+axs[3].grid()
+axs[3].set_ylabel('$V$')
+
+axs[4].plot(tt_hor, xx_star[4,:], linewidth=2)
+axs[4].plot(tt_hor, xx_ref[4,:], 'g--', linewidth=2)
+axs[4].grid()
+axs[4].set_ylabel('$beta$')
+
+axs[5].plot(tt_hor, xx_star[5,:],'r', linewidth=2)
+axs[5].plot(tt_hor, xx_ref[5,:], 'r--', linewidth=2)
+axs[5].grid()
+axs[5].set_ylabel('$psi dot$')
+
+axs[6].plot(tt_hor, uu_star[0,:], linewidth=2)
+axs[6].plot(tt_hor, uu_ref[0,:], 'g--', linewidth=2)
+axs[6].grid()
+axs[6].set_ylabel('$delta$')
+
+axs[7].plot(tt_hor, uu_star[1,:],'r', linewidth=2)
+axs[7].plot(tt_hor, uu_ref[1,:], 'r--', linewidth=2)
+axs[7].grid()
+axs[7].set_ylabel('$F$')
+axs[7].set_xlabel('time')
+
+plt.show()
+
 # SMOOTHING the reference trajectory  -----------------------------------------------------------------------------------
 
 # Perform linear interpolation for traj_ref[0]
@@ -493,4 +586,3 @@ plt.xlabel('time')
 plt.ylabel('$x_3$')
 plt.legend()
 plt.show()
-'''
