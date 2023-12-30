@@ -6,6 +6,7 @@
 #
 
 import numpy as np
+import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
 from Dynamics import dynamics
@@ -28,7 +29,7 @@ dx = 1e-3           #infinitesimal increment
 du = 1e-3           #infinitesimal increment
 ns = 6              #number of states
 ni = 2              #number of inputs
-max_iters = 30      #maximum number of iterations for Newton's method
+max_iters = 20      #maximum number of iterations for Newton's method
 
 m = 1480    #Kg
 Iz = 1950   #Kg*m^2
@@ -129,30 +130,30 @@ def equations(vars):
     return [eq1, eq2, eq3]
 
 # Initial guess for the solution
-initial_guess = [0.5, 0.1, 300]          # [x5(0), u0(0), u1(0)]
+initial_guess = [0.5, 0.1, 0]          # [x5(0), u0(0), u1(0)]
 
 # FIRST EQUILIBRIUM
 #imposing x3 and x4
-x3 = 7                  
+x3 = 1                  
 x4 = 0 
 
-eq[2,0] = eq[5,0]*T_mid                         # psi
 eq[3,0] = np.copy(x3)                           # V
 eq[4,0] = np.copy(x4)                           # beta
 eq[5:,0] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
-eq[0,0]=(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*T_mid     # x
-eq[1,0]=(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
+eq[2,0] = eq[5,0]*T_mid                         # psi   
+eq[0,0] =(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*T_mid     # x
+eq[1,0] =(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
 
 # SECOND EQUILIBRIUM
 x3 = 5                  
-x4 = 0.1 
-
-eq[2,1] = eq[5,0] + eq[5,1]*T_mid                                    
+x4 = 0.25 
+                                
 eq[3,1] = np.copy(x3)
 eq[4,1] = np.copy(x4)
 eq[5:,1] = fsolve(equations, initial_guess)
-eq[0,1]= eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*T_mid
-eq[1,1]= eq[1,0] + (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,1])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,1]))*T_mid
+eq[2,1] = eq[5,0] + eq[5,1]*T_mid    
+eq[0,1] = eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*T_mid
+eq[1,1] = eq[1,0] + (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,1])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,1]))*T_mid
 
 # Print the result
 print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
@@ -230,9 +231,9 @@ plt.show()
 # GRADIENT METHOD evaluation  ----------------------------------------------------------------------------------------
 
 # weight matrices
-Q = np.diag([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-QT = Q
-R = np.diag([0.5, 0.5])
+Qt = np.diag([1, 1, 100, 1, 100, 100])
+QT = Qt
+Rt = np.diag([1, 0.01])
 
 # arrays to store data
 xx = np.zeros((ns, TT, max_iters))   # state seq.
@@ -252,7 +253,7 @@ xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
 
 # perform Gradient Descent method
-xx, uu, descent, JJ = Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters)
+xx, uu, descent, JJ = Gradient (xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
 
 xx_star = xx[:,:,max_iters-1]
 uu_star = uu[:,:,max_iters-1]
@@ -323,6 +324,14 @@ axs[7].set_xlabel('time')
 
 plt.show()
 
+# Plotting the trajectory
+plt.plot(xx_star[0,:], xx_star[1,:], label='Trajectory')
+plt.title('Vehicle Trajectory')
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
+plt.legend()
+plt.grid(True)
+plt.show()
 
 #########################################
 ##### TASK 2: TRAJECTORY GENERATION II ##

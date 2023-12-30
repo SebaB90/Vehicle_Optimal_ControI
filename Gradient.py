@@ -6,6 +6,7 @@
 #
 
 import numpy as np
+import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
 from Dynamics import dynamics
@@ -15,7 +16,7 @@ from Dynamics import dynamics
 ns = 6              #number of states
 ni = 2              #number of inputs
 
-TT = int(5.e2)          #discrete time samples
+TT = int(5e2)          #discrete time samples
 T_mid = TT/2            #half time
 term_cond = 1e-6        #terminal condition
 
@@ -23,10 +24,10 @@ term_cond = 1e-6        #terminal condition
 cc = 0.5
 beta = 0.7
 armijo_maxiters = 20    # number of Armijo iterations
-stepsize_0 = 0.5        # initial stepsize
+stepsize_0 = 1          # initial stepsize
 
 
-def cost(xx,uu, xx_ref, uu_ref, Q, R):
+def cost(xx, uu, xx_ref, uu_ref, Q, R):
 
     xx = xx[:,None]
     uu = uu[:,None]
@@ -41,7 +42,7 @@ def cost(xx,uu, xx_ref, uu_ref, Q, R):
 
     return l.squeeze(), lx, lu
 
-def cost_f(xx,xx_ref, QT):
+def cost_f(xx, xx_ref, QT):
     
     xx = xx[:,None]
     xx_ref = xx_ref[:,None]
@@ -61,6 +62,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
     JJ = np.zeros(max_iters)                # collect cost
     descent = np.zeros(max_iters)           # collect descent direction
     descent_arm = np.zeros(max_iters)       # collect descent direction
+    x0 = np.copy(xx_ref[:,0])
 
     for kk in range(max_iters-1):
 
@@ -68,11 +70,11 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         # calculate cost
         for tt in range(TT-1):
-            temp_cost = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
+            temp_cost = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
             JJ[kk] += temp_cost
 
-            temp_cost = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[0]
-            JJ[kk] += temp_cost
+        temp_cost = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[0]
+        JJ[kk] += temp_cost
 
         # Descent direction calculation
         lmbd_temp = cost_f(xx[:,TT-1,kk], xx_ref[:,TT-1], QT)[1]
@@ -110,7 +112,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             xx_temp = np.zeros((ns,TT))
             uu_temp = np.zeros((ni,TT))
 
-            xx_temp[:,0] = xx_ref[:,0]
+            xx_temp[:,0] = x0
 
             for tt in range(TT-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
@@ -134,7 +136,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
                 stepsize = beta*stepsize
             
             else:
-                # print('Armijo stepsize = {:.3e}'.format(stepsize))
+                print('Armijo stepsize = {:.3e}'.format(stepsize))
                 break
 
         # Armijo plot
@@ -151,7 +153,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             xx_temp = np.zeros((ns,TT))
             uu_temp = np.zeros((ni,TT))
 
-            xx_temp[:,0] = xx_ref[:,0]
+            xx_temp[:,0] = x0
 
             for tt in range(TT-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + step*deltau[:,tt,kk]
@@ -172,7 +174,6 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         plt.figure(1)
         plt.clf()
-
         plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')
         plt.plot(steps, JJ[kk] + descent_arm[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
         plt.plot(steps, JJ[kk] + cc*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$J(\\mathbf{u}^k) - stepsize*c*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
@@ -188,7 +189,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         xx_temp = np.zeros((ns,TT))
         uu_temp = np.zeros((ni,TT))
 
-        xx_temp[:,0] = xx_ref[:,0]
+        xx_temp[:,0] = x0
 
         for tt in range(TT-1):
             uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
@@ -202,7 +203,6 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,descent[kk], JJ[kk]))
 
         if descent[kk] <= term_cond:
-
             max_iters = kk
             break
 
