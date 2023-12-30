@@ -229,16 +229,10 @@ plt.show()
 
 # GRADIENT METHOD evaluation  ----------------------------------------------------------------------------------------
 
-# ARMIJO PARAMETERS
-cc = 0.5
-beta = 0.7
-armijo_maxiters = 20 # number of Armijo iterations
-
-# Define a cost function
-
+# weight matrices
 Q = np.diag([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 QT = Q
-R =  np.diag([0.5, 0.5])
+R = np.diag([0.5, 0.5])
 
 # arrays to store data
 xx = np.zeros((ns, TT, max_iters))   # state seq.

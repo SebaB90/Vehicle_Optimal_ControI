@@ -12,19 +12,8 @@ from Dynamics import dynamics
 
 
 #define params
-dt = 1e-3           #sample time
-dx = 1e-3           #infinitesimal increment
-du = 1e-3           #infinitesimal increment
 ns = 6              #number of states
 ni = 2              #number of inputs
-max_iters = 30      #maximum number of iterations for Newton's method
-
-m = 1480    #Kg
-Iz = 1950   #Kg*m^2
-a = 1.421   #m
-b = 1.029   #m
-mi = 1      #nodim
-g = 9.81    #m/s^2
 
 TT = int(5.e2)          #discrete time samples
 T_mid = TT/2            #half time
@@ -62,24 +51,15 @@ def cost_f(xx,xx_ref, QT):
 
     return lT.squeeze(), lTx
 
-
-# arrays to store data
-xx = np.zeros((ns, TT, max_iters))   # state seq.
-uu = np.zeros((ni, TT, max_iters))   # input seq.
-xx_ref = np.zeros((ns, TT))          # state ref.
-uu_ref = np.zeros((ni, TT))          # input ref.
-
-lmbd = np.zeros((ns, TT, max_iters))    # lambdas - costate seq.
-
-deltau = np.zeros((ni,TT, max_iters))   # Du - descent direction
-dJ = np.zeros((ni,TT, max_iters))       # DJ - gradient of J wrt u
-
-JJ = np.zeros(max_iters)                # collect cost
-descent = np.zeros(max_iters)           # collect descent direction
-descent_arm = np.zeros(max_iters)       # collect descent direction
-
-
 def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
+
+    # arrays to store data
+    lmbd = np.zeros((ns, TT, max_iters))    # lambdas - costate seq.
+    deltau = np.zeros((ni,TT, max_iters))   # Du - descent direction
+    dJ = np.zeros((ni,TT, max_iters))       # DJ - gradient of J wrt u
+    JJ = np.zeros(max_iters)                # collect cost
+    descent = np.zeros(max_iters)           # collect descent direction
+    descent_arm = np.zeros(max_iters)       # collect descent direction
 
     for kk in range(max_iters-1):
 
@@ -120,7 +100,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         stepsizes = []  # list of stepsizes
         costs_armijo = []
 
-        stepsize = 1
+        stepsize = 0.1
 
         for ii in range(armijo_maxiters):
 
