@@ -22,7 +22,8 @@ term_cond = 1e-6        #terminal condition
 # ARMIJO PARAMETERS
 cc = 0.5
 beta = 0.7
-armijo_maxiters = 20 # number of Armijo iterations
+armijo_maxiters = 20    # number of Armijo iterations
+stepsize_0 = 0.5        # initial stepsize
 
 
 def cost(xx,uu, xx_ref, uu_ref, Q, R):
@@ -100,7 +101,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         stepsizes = []  # list of stepsizes
         costs_armijo = []
 
-        stepsize = 0.1
+        stepsize = stepsize_0
 
         for ii in range(armijo_maxiters):
 
@@ -138,7 +139,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         # Armijo plot
 
-        steps = np.linspace(0,1,int(2e1))
+        steps = np.linspace(0,stepsize_0,int(2e1))
         costs = np.zeros(len(steps))
 
         for ii in range(len(steps)):

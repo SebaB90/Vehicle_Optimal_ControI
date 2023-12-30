@@ -136,7 +136,7 @@ initial_guess = [0.5, 0.1, 300]          # [x5(0), u0(0), u1(0)]
 x3 = 7                  
 x4 = 0 
 
-eq[2,0] = 0                                     # psi
+eq[2,0] = eq[5,0]*T_mid                         # psi
 eq[3,0] = np.copy(x3)                           # V
 eq[4,0] = np.copy(x4)                           # beta
 eq[5:,0] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
@@ -147,7 +147,7 @@ eq[1,0]=(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(
 x3 = 5                  
 x4 = 0.1 
 
-eq[2,1] = 20                                    
+eq[2,1] = eq[5,0] + eq[5,1]*T_mid                                    
 eq[3,1] = np.copy(x3)
 eq[4,1] = np.copy(x4)
 eq[5:,1] = fsolve(equations, initial_guess)
