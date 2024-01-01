@@ -40,7 +40,15 @@ def cost(xx, uu, xx_ref, uu_ref, Q, R):
     lx = Q@(xx - xx_ref)
     lu = R@(uu - uu_ref)
 
-    return l.squeeze(), lx, lu
+    lxx = Q
+    luu = R
+    lux = np.zeros((ns, ni))
+    lxu = np.zeros((ni, ns))
+
+    hessian = np.block([[lxx, lux], [lxu, luu]])
+    gradient = np.concatenate([lx, lu], axis=0)
+
+    return l.squeeze(), gradient.squeeze(), hessian.squeeze() 
 
 def cost_f(xx, xx_ref, QT):
     
@@ -48,39 +56,68 @@ def cost_f(xx, xx_ref, QT):
     xx_ref = xx_ref[:,None]
 
     lT = 0.5*(xx - xx_ref).T@QT@(xx - xx_ref)
-
     lTx = QT@(xx - xx_ref)
+    lTu = np.zeros((ni,1))
 
-    return lT.squeeze(), lTx
+    lTxx = QT
+    lTuu = np.zeros((ni, ni))
+    lTux = np.zeros((ns, ni))
+    lTxu = np.zeros((ni, ns))
 
-def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
+    hessianT = np.block([[lTxx, lTux], [lTxu, lTuu]])
+    gradientT = np.concatenate([lTx, lTu], axis=0)
+
+    return lT.squeeze(), gradientT.squeeze(), hessianT.squeeze()
+
+def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
     # arrays to store data
+
     lmbd = np.zeros((ns, TT, max_iters))    # lambdas - costate seq.
     deltau = np.zeros((ni,TT, max_iters))   # Du - descent direction
     dJ = np.zeros((ni,TT, max_iters))       # DJ - gradient of J wrt u
-    JJ = np.zeros(max_iters)                # collect cost
+    ll = np.zeros((max_iters-1))
+    dl = np.zeros((ns+ni, max_iters-1))
+    d2l = np.zeros((ns+ni,ns+ni, max_iters-1))
+    dl_norm = np.zeros(max_iters-1)         #[for plots]
+    J = np.zeros((max_iters))               # collect cost
+    dJ = np.zeros((ns+ni,max_iters))
+    ddJ = np.zeros((ns+ni, ns+ni, max_iters))
+    direction = np.zeros((ni,TT, max_iters))
     descent = np.zeros(max_iters)           # collect descent direction
     descent_arm = np.zeros(max_iters)       # collect descent direction
+
     x0 = np.copy(xx_ref[:,0])
 
     for kk in range(max_iters-1):
 
-        JJ[kk] = 0
+        J[kk] = 0
 
         # calculate cost
         for tt in range(TT-1):
-            temp_cost = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
-            JJ[kk] += temp_cost
+            ll[kk], dl[:,kk], d2l[:,:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)
+            J[kk] += ll[kk]
+            dJ[:,kk] += dl[:,kk] 
+            ddJ[:,:,kk] += d2l[:,:,kk]
 
-        temp_cost = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[0]
-        JJ[kk] += temp_cost
+        ll[kk], dl[:,kk], d2l[:,:,kk] = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)
+        J[kk] += ll[kk]
+        dJ[:,kk] += dl[:,kk] 
+        ddJ[:,:,kk] += d2l[:,:,kk]
 
+        # Descent direction calculation
+        for tt in reversed(range(TT-1)):
+            dl_norm[kk] = np.linalg.norm(dJ[:,kk]) #[for plots]
+            direction[:,tt,kk] = - np.linalg.inv(ddJ[:,:,kk])@dJ[:,kk]
+
+                
         # Descent direction calculation
         lmbd_temp = cost_f(xx[:,TT-1,kk], xx_ref[:,TT-1], QT)[1]
         lmbd[:,TT-1,kk] = lmbd_temp.squeeze()
 
         for tt in reversed(range(TT-1)):                        # integration backward in time
+
+            Qt = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)
 
             at, bt = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[1:]
             fx, fu = dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
@@ -99,6 +136,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             descent[kk] += deltau[:,tt,kk].T@deltau[:,tt,kk]
             descent_arm[kk] += dJ[:,tt,kk].T@deltau[:,tt,kk]
 
+
         # Stepsize selection - ARMIJO
         stepsizes = []  # list of stepsizes
         costs_armijo = []
@@ -115,7 +153,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             xx_temp[:,0] = x0
 
             for tt in range(TT-1):
-                uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
+                uu_temp[:,tt] = uu[:,tt,kk] + stepsize*direction[:,tt,kk]
                 xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
@@ -129,9 +167,9 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             JJ_temp += temp_cost
 
             stepsizes.append(stepsize)                              # save the stepsize
-            costs_armijo.append(np.min([JJ_temp, 100*JJ[kk]]))      # save the cost associated to the stepsize
+            costs_armijo.append(np.min([JJ_temp, 100*J[kk]]))       # save the cost associated to the stepsize
 
-            if JJ_temp > JJ[kk]  + cc*stepsize*descent_arm[kk]:
+            if JJ_temp > J[kk]  + cc*stepsize*dJ[:,kk].T@direction:
                 # update the stepsize
                 stepsize = beta*stepsize
             
@@ -156,7 +194,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             xx_temp[:,0] = x0
 
             for tt in range(TT-1):
-                uu_temp[:,tt] = uu[:,tt,kk] + step*deltau[:,tt,kk]
+                uu_temp[:,tt] = uu[:,tt,kk] + step*direction[:,tt,kk]
                 xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
@@ -169,14 +207,15 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             temp_cost = cost_f(xx_temp[:,-1], xx_ref[:,-1], QT)[0]
             JJ_temp += temp_cost
 
-            costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
+            costs[ii] = np.min([JJ_temp, 100*J[kk]])
 
 
         plt.figure(1)
         plt.clf()
-        plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')
-        plt.plot(steps, JJ[kk] + descent_arm[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
-        plt.plot(steps, JJ[kk] + cc*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$J(\\mathbf{u}^k) - stepsize*c*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+        plt.plot(steps, costs, color='g', label='$\\ell(x^k - \\gamma*d^k$)')
+        plt.plot(steps, J[kk] + dJ[:,kk].T@direction*steps, color='r', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k$')
+        plt.plot(steps, J[kk] + dJ[:,kk].T@direction*steps + 1/2*direction.T@ddJ[:,:,kk]@direction*steps**2, color='b', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k - \\gamma^2 d^{k\\top}\\nabla^2\\ell(x^k) d^k$')
+        plt.plot(steps, ll[kk] + cc*dl[:,kk].T@direction*steps, color='g', linestyle='dashed', label='$\\ell(x^k) - \\gamma*c*\\nabla\\ell(x^k)^{\\top}d^k$')
         plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
         plt.grid()
         plt.xlabel('stepsize')
@@ -192,7 +231,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         xx_temp[:,0] = x0
 
         for tt in range(TT-1):
-            uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
+            uu_temp[:,tt] = uu[:,tt,kk] + stepsize*direction[:,tt,kk]
             xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
         xx[:,:,kk+1] = xx_temp
@@ -200,10 +239,10 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         # Termination condition
 
-        print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,descent[kk], JJ[kk]))
+        print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,np.linalg.norm(direction)[kk], J[kk]))
 
-        if descent[kk] <= term_cond:
+        if np.linalg.norm(direction)[kk] <= term_cond:
             max_iters = kk
             break
 
-    return xx, uu, descent, JJ
+    return xx, uu, np.linalg.norm(direction), J

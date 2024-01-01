@@ -11,7 +11,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from Dynamics import dynamics
 from scipy.optimize import fsolve
-from Gradient import Gradient
+from Newton import Newton
 
 # Allow Ctrl-C to work despite plotting
 import signal
@@ -42,6 +42,8 @@ TT = int(5e2)          #discrete time samples
 T_mid = TT/2            #half time
 term_cond = 1e-6        #terminal condition
 
+plot = False
+
 # defining x and u
 u = np.array([0.25, 20])
 x = np.array([0, 0, 0, 1, 0, 0])
@@ -52,27 +54,28 @@ A = fx.T
 B = fu.T
 
 # OPEN LOOP TEST to check if the dynamics do what expected ---------------------------------------------------
+if plot:
+    x_traj = [np.copy(x[0])]
+    y_traj = [np.copy(x[1])]
+    traj = np.copy(x)
 
-x_traj = [np.copy(x[0])]
-y_traj = [np.copy(x[1])]
-traj = np.copy(x)
+    total_time = 100                     # Adjust the total simulation time as needed
+    num_steps = int(total_time / dt)
 
-total_time = 100                     # Adjust the total simulation time as needed
-num_steps = int(total_time / dt)
+    for _ in range(num_steps):
+        traj, _, _ = dynamics(traj, u)
+        x_traj.append(traj[0])
+        y_traj.append(traj[1])
 
-for _ in range(num_steps):
-    traj, _, _ = dynamics(traj, u)
-    x_traj.append(traj[0])
-    y_traj.append(traj[1])
+    # Plotting the trajectory
 
-# Plotting the trajectory
-plt.plot(x_traj, y_traj, label='Trajectory')
-plt.title('Vehicle Trajectory')
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.legend()
-plt.grid(True)
-plt.show()
+    plt.plot(x_traj, y_traj, label='Trajectory')
+    plt.title('Vehicle Trajectory')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 # Checking derivatives
 
@@ -228,7 +231,7 @@ fig.align_ylabels(axs)
 
 plt.show()
 
-# GRADIENT METHOD evaluation  ----------------------------------------------------------------------------------------
+# NEWTON'S METHOD evaluation  ----------------------------------------------------------------------------------------
 
 # weight matrices
 Qt = np.diag([1, 1, 100, 1, 100, 100])
@@ -252,8 +255,8 @@ uu_ref = traj_ref[6:]
 xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
 
-# perform Gradient Descent method
-xx, uu, descent, JJ = Gradient (xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
+# perform Newton's like method
+xx, uu, descent, JJ = Newton(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
 
 xx_star = xx[:,:,max_iters-1]
 uu_star = uu[:,:,max_iters-1]
