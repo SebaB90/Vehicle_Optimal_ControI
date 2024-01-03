@@ -12,12 +12,17 @@ dt = 1e-3   #sample time
 ns = 6      #number of states
 ni = 2      #number of inputs
 
+TT = int(1e1)          #discrete time samples
+T = int((TT/dt))       #time instants
+T_mid = int(T/2)       #half time
+
 m = 1480    #Kg
 Iz = 1950   #Kg*m^2
 a = 1.421   #m
 b = 1.029   #m
 mi = 1      #nodim
 g = 9.81    #m/s^2
+
 
 def dynamics (x, u):
 

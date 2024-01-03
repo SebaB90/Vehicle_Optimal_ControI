@@ -9,7 +9,7 @@ import numpy as np
 import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
-from Dynamics import dynamics
+import Dynamics as dyn
 
 
 #define params
@@ -17,9 +17,9 @@ ns = 6              #number of states
 ni = 2              #number of inputs
 dt = 1e-3           #sample time
 
-TT = int(1e1)           #discrete time samples
-T = int((TT/dt))
-T_mid = T/2            #half time
+TT = dyn.TT             #discrete time samples
+T = dyn.T               #time instants
+T_mid = dyn.T_mid       #half time
 term_cond = 1e-6        #terminal condition
 
 # ARMIJO PARAMETERS
@@ -85,7 +85,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         for tt in reversed(range(T-1)):                        # integration backward in time
 
             at, bt = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[1:]
-            fx, fu = dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
+            fx, fu = dyn.dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
 
             At = fx.T
             Bt = fu.T
@@ -118,7 +118,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             for tt in range(T-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
-                xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+                xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
@@ -159,7 +159,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             for tt in range(T-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + step*deltau[:,tt,kk]
-                xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+                xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
@@ -194,7 +194,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         for tt in range(T-1):
             uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
-            xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+            xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
         xx[:,:,kk+1] = xx_temp
         uu[:,:,kk+1] = uu_temp

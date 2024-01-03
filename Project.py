@@ -9,11 +9,13 @@ import numpy as np
 import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
-from Dynamics import dynamics
+import Dynamics as dyn
+import Gradient as grad
+import Newton as nwtn
 from scipy.optimize import fsolve
 from scipy.interpolate import PchipInterpolator
 from Newton import Newton
-import Gradient as grad
+
 
 
 # Allow Ctrl-C to work despite plotting
@@ -27,11 +29,11 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 #define params
 
-dt = grad.dt           #sample time
+dt = dyn.dt           #sample time
 dx = 1e-3           #infinitesimal increment
 du = 1e-3           #infinitesimal increment
-ns = 6              #number of states
-ni = 2              #number of inputs
+ns = dyn.ns              #number of states
+ni = dyn.ni              #number of inputs
 max_iters = 20      #maximum number of iterations for Newton's method
 
 m = 1480    #Kg
@@ -41,12 +43,12 @@ b = 1.029   #m
 mi = 1      #nodim
 g = 9.81    #m/s^2
 
-TT = grad.TT          #discrete time samples
-T = grad.T       #time instants
-T_mid = grad.T_mid            #half time
+TT = dyn.TT            #discrete time samples
+T = dyn.T              #time instants
+T_mid = dyn.T_mid      #half time
 term_cond = 1e-6       #terminal condition
 
-plot = True
+plot = False
 Task0 = False
 
 if Task0 :
@@ -54,7 +56,7 @@ if Task0 :
     u = np.array([0.25, 20])
     x = np.array([0, 0, 0, 1, 0, 0])
 
-    x_plus, fx, fu = dynamics(x, u)
+    x_plus, fx, fu = dyn.dynamics(x, u)
 
     A = fx.T
     B = fu.T
@@ -69,7 +71,7 @@ if Task0 :
         num_steps = int(total_time / dt)
 
         for i in range(num_steps-1):
-            traj = dynamics(traj, u)[0]
+            traj = dyn.dynamics(traj, u)[0]
             x_traj.append(traj[0])
             y_traj.append(traj[1])
 
@@ -111,12 +113,12 @@ if Task0 :
         ddu[k] = du
 
     xdx = x + ddx
-    xx_plus = dynamics(xdx, u)[0]
+    xx_plus = dyn.dynamics(xdx, u)[0]
     diff_x = xx_plus - x_plus
     check_x = diff_x - np.dot(A,ddx)
 
     udu = u + ddu
-    xx_plus = dynamics(x, udu)[0]    
+    xx_plus = dyn.dynamics(x, udu)[0]    
     diff_u = xx_plus - x_plus      
     check_u = diff_u - np.dot(B,ddu)
 
@@ -155,7 +157,7 @@ def equations(vars):
 
 # FIRST EQUILIBRIUM
 #imposing x3 and x4
-x3 = 1                  
+x3 = 4                  
 x4 = 0.1
 
 eq[3,0] = np.copy(x3)                           # V
@@ -166,8 +168,8 @@ eq[0,0] = (eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.si
 eq[1,0] = (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
 
 # SECOND EQUILIBRIUM
-x3 = 5                 
-x4 = 0.2
+x3 = 6                 
+x4 = 0.25
 
 eq[3,1] = np.copy(x3)
 eq[4,1] = np.copy(x4)
@@ -190,7 +192,7 @@ traj_ref[3:,0] = eq[3:,0]
 
 for tt in range(1,T):
   
-    traj = dynamics(traj_ref[:6,tt-1], traj_ref[6:,tt-1])[0]
+    traj = dyn.dynamics(traj_ref[:6,tt-1], traj_ref[6:,tt-1])[0]
     traj_ref[:3, tt] = traj[:3]
 
     if tt < T_mid:
@@ -202,6 +204,7 @@ for tt in range(1,T):
 tt_hor = range(T)
 
 ####################################################################################################################################
+### Plot to test trajectory reference
 plt.plot(traj_ref[0,:], traj_ref[1,:], label='Trajectory')
 plt.title('Vehicle Trajectory')
 plt.xlabel('X-axis')
@@ -251,11 +254,6 @@ plt.show()
 
 # NEWTON'S METHOD evaluation  ----------------------------------------------------------------------------------------
 
-# weight matrices
-Qt = np.diag([1, 1, 10, 1, 10, 10])
-QT = Qt
-Rt = np.diag([10, 1])
-
 # arrays to store data
 xx = np.zeros((ns, T, max_iters))   # state seq.
 uu = np.zeros((ni, T, max_iters))   # input seq.
@@ -275,6 +273,80 @@ uu_ref = traj_ref[6:,:]
 
 xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
+
+fx, fu = dyn.dynamics(xx_init[:,0], uu_init[:,0])[1:]
+A = fx.T
+B = fu.T
+
+# weight matrices
+Qt = np.diag([1, 1, 10, 1, 10, 10])
+QT = Qt
+Rt = np.diag([10, 1])
+S = np.zeros((ni,ns))
+
+# Affine terms (for tracking)
+q = np.zeros((ns,T))
+r = np.zeros((ni,T))
+
+for tt in range(T):
+    q_temp = -Qt@xx_ref[:,tt]
+    q[:,tt] = q_temp.squeeze()
+
+qf =  -QT@xx_ref[:,-1]
+
+KK,sigma,_,xx,uu = nwtn.ltv_LQR(A, B, Qt, Rt, S, QT, T, xx_init[:,0], q, r, qf)
+
+################################################################################################
+'''
+tt_hor = range(T)
+
+fig, axs = plt.subplots(8, 1, sharex='all')
+
+axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
+axs[0].plot(tt_hor, xx[0,:], linewidth=2)
+axs[0].grid()
+axs[0].set_ylabel('$x1$')
+
+axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
+axs[1].plot(tt_hor, xx[1,:], linewidth=2)
+axs[1].grid()
+axs[1].set_ylabel('$x_$')
+
+axs[2].plot(tt_hor, xx_ref[2,:], 'g--', linewidth=2)
+axs[2].plot(tt_hor, xx[2,:], linewidth=2)
+axs[2].grid()
+axs[2].set_ylabel('$x3$')
+
+axs[3].plot(tt_hor, xx_ref[3,:], 'g--', linewidth=2)
+axs[3].plot(tt_hor, xx[3,:], linewidth=2)
+axs[3].grid()
+axs[3].set_ylabel('$x_1$')
+
+axs[4].plot(tt_hor, xx_ref[4,:], 'g--', linewidth=2)
+axs[4].plot(tt_hor, xx[4,:], linewidth=2)
+axs[4].grid()
+axs[4].set_ylabel('$x_2$')
+
+axs[5].plot(tt_hor, xx_ref[5,:], 'g--', linewidth=2)
+axs[5].plot(tt_hor, xx[5,:], linewidth=2)
+axs[5].grid()
+axs[5].set_ylabel('$u$')
+
+axs[6].plot(tt_hor, uu[0,:],'r', linewidth=2)
+axs[6].grid()
+axs[6].set_ylabel('$u0$')
+
+axs[7].plot(tt_hor, uu[1,:],'r', linewidth=2)
+axs[7].grid()
+axs[7].set_ylabel('$u1$')
+axs[7].set_xlabel('time')
+
+fig.align_ylabels(axs)
+
+plt.show()
+'''
+#####################################################################################################
+
 
 # perform Newton's like method
 if plot:
@@ -370,7 +442,14 @@ fig.suptitle('Trajectory Smoothing using PCHIP Spline')
 traj_smooth = np.zeros((8,T))
 x_traj_smooth = np.zeros((8,T))
 
-for i in range (ns+ni):
+axs[0].plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original Reference Trajectory')
+axs[0].grid()
+axs[1].plot(tt_hor, traj_ref[1, :], 'g--', linewidth=2, label='Original Reference Trajectory')
+axs[1].grid()
+axs[2].plot(tt_hor, traj_ref[2, :], 'g--', linewidth=2, label='Original Reference Trajectory')
+axs[2].grid()
+
+for i in range (3,ns+ni):
     new_num_points = 7      # Adjust the number of points for a smoother curve
     interp_indices = np.linspace(0, T - 1, new_num_points)
     new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
@@ -383,7 +462,7 @@ for i in range (ns+ni):
     cs = PchipInterpolator(x_spl, y_spl)
 
     # Generate new, smoother x values (denser for plotting)
-    x_spl_new = np.linspace(min(x_spl), max(x_spl), TT)
+    x_spl_new = np.linspace(min(x_spl), max(x_spl), T)
 
     # Compute the smoothed y values
     y_spl_new = cs(x_spl_new)
@@ -411,11 +490,15 @@ axs[7].set_ylabel('$F$')
 plt.legend()
 plt.show()
 
+# arrays to store data
+xx = np.zeros((ns, T, max_iters))   # state seq.
+uu = np.zeros((ni, T, max_iters))   # input seq.
+
 # initial conditions
 xx_init = np.zeros((ns, T))
 uu_init = np.zeros((ni, T))
 
-for i in range(0,TT):
+for i in range(0,T):
     xx_init[:,i] = traj_smooth[0:6,0]
     uu_init[:,i] = traj_smooth[6:,0]
 
@@ -425,7 +508,7 @@ uu_ref = traj_smooth[6:,:]
 xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
 
-xx, uu, descent, JJ = Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
+xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
 
 xx_star = xx[:,:,max_iters-1]
 uu_star = uu[:,:,max_iters-1]

@@ -9,15 +9,16 @@ import numpy as np
 import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
-from Dynamics import dynamics
-
+import Dynamics as dyn
 
 #define params
-ns = 6              #number of states
-ni = 2              #number of inputs
+ns = dyn.ns              #number of states
+ni = dyn.ni              #number of inputs
+dt = dyn.dt           #sample time
 
-TT = int(5e2)          #discrete time samples
-T_mid = TT/2            #half time
+TT = dyn.TT             #discrete time samples
+T = dyn.T               #time instants
+T_mid = dyn.T_mid       #half time
 term_cond = 1e-6        #terminal condition
 
 # ARMIJO PARAMETERS
@@ -25,6 +26,182 @@ cc = 0.5
 beta = 0.7
 armijo_maxiters = 20    # number of Armijo iterations
 stepsize_0 = 1          # initial stepsize
+
+
+def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = None, qqfin = None):
+
+  """
+	LQR for LTV system with (time-varying) affine cost
+	
+  Args
+    - AAin (nn x nn (x TT)) matrix
+    - BBin (nn x mm (x TT)) matrix
+    - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
+    - QQfin (nn x nn) terminal cost
+    - qq (nn x (x TT)) affine terms
+    - rr (mm x (x TT)) affine terms
+    - qqf (nn x (x TT)) affine terms - final cost
+    - TT time horizon
+  Return
+    - KK (mm x nn x TT) optimal gain sequence
+    - PP (nn x nn x TT) riccati matrix
+  """
+	
+  try:
+    # check if matrix is (.. x .. x TT) - 3 dimensional array 
+    ns, lA = AAin.shape[1:]
+  except:
+    # if not 3 dimensional array, make it (.. x .. x 1)
+    AAin = AAin[:,:,None]
+    ns, lA = AAin.shape[1:]
+
+  try:  
+    ni, lB = BBin.shape[1:]
+  except:
+    BBin = BBin[:,:,None]
+    ni, lB = BBin.shape[1:]
+
+  try:
+      nQ, lQ = QQin.shape[1:]
+  except:
+      QQin = QQin[:,:,None]
+      nQ, lQ = QQin.shape[1:]
+
+  try:
+      nR, lR = RRin.shape[1:]
+  except:
+      RRin = RRin[:,:,None]
+      nR, lR = RRin.shape[1:]
+
+  try:
+      nSi, nSs, lS = SSin.shape
+  except:
+      SSin = SSin[:,:,None]
+      nSi, nSs, lS = SSin.shape
+
+  # Check dimensions consistency -- safety
+  if nQ != ns:
+    print("Matrix Q does not match number of states")
+    exit()
+  if nR != ni:
+    print("Matrix R does not match number of inputs")
+    exit()
+  if nSs != ns:
+    print("Matrix S does not match number of states")
+    exit()
+  if nSi != ni:
+    print("Matrix S does not match number of inputs")
+    exit()
+
+
+  if lA < TT:
+    AAin = AAin.repeat(TT, axis=2)
+  if lB < TT:
+    BBin = BBin.repeat(TT, axis=2)
+  if lQ < TT:
+    QQin = QQin.repeat(TT, axis=2)
+  if lR < TT:
+    RRin = RRin.repeat(TT, axis=2)
+  if lS < TT:
+    SSin = SSin.repeat(TT, axis=2)
+
+  # Check for affine terms
+
+  augmented = False
+
+  if qqin is not None or rrin is not None or qqfin is not None:
+    augmented = True
+    print("Augmented term!")
+
+  KK = np.zeros((ni, ns, TT))
+  sigma = np.zeros((ni, TT))
+  PP = np.zeros((ns, ns, TT))
+  pp = np.zeros((ns, TT))
+
+  QQ = QQin
+  RR = RRin
+  SS = SSin
+  QQf = QQfin
+  
+  qq = qqin
+  rr = rrin
+
+  qqf = qqfin
+
+  AA = AAin
+  BB = BBin
+
+  xx = np.zeros((ns, TT))
+  uu = np.zeros((ni, TT))
+
+  xx[:,0] = x0
+  
+  PP[:,:,-1] = QQf
+  pp[:,-1] = qqf
+  
+  # Solve Riccati equation
+  for tt in reversed(range(TT-1)):
+    QQt = QQ[:,:,tt]
+    qqt = qq[:,tt][:,None]
+    RRt = RR[:,:,tt]
+    rrt = rr[:,tt][:,None]
+    AAt = AA[:,:,tt]
+    BBt = BB[:,:,tt]
+    SSt = SS[:,:,tt]
+    PPtp = PP[:,:,tt+1]
+    pptp = pp[:, tt+1][:,None]
+
+    MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
+    mmt = rrt + BBt.T @ pptp
+    
+    PPt = AAt.T @ PPtp @ AAt - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ (BBt.T@PPtp@AAt + SSt) + QQt
+    ppt = AAt.T @ pptp - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ mmt + qqt
+
+    PP[:,:,tt] = PPt
+    pp[:,tt] = ppt.squeeze()
+
+  # Evaluate KK
+  
+  for tt in range(TT-1):
+    QQt = QQ[:,:,tt]
+    qqt = qq[:,tt][:,None]
+    RRt = RR[:,:,tt]
+    rrt = rr[:,tt][:,None]
+    AAt = AA[:,:,tt]
+    BBt = BB[:,:,tt]
+    SSt = SS[:,:,tt]
+
+    PPtp = PP[:,:,tt+1]
+    pptp = pp[:,tt+1][:,None]
+
+    # Check positive definiteness
+
+    MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
+    mmt = rrt + BBt.T @ pptp
+
+    # for other purposes we could add a regularization step here...
+
+    KK[:,:,tt] = -MMt_inv@(BBt.T@PPtp@AAt + SSt)
+    sigma_t = -MMt_inv@mmt
+
+    sigma[:,tt] = sigma_t.squeeze()
+
+
+  for tt in range(TT - 1):
+    # Trajectory
+
+    uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
+    xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
+
+    xx[:,tt+1] = xx_p
+
+    xxout = xx
+    uuout = uu
+
+  return KK, sigma, PP, xxout, uuout
+
+
+
 
 
 def cost(xx, uu, xx_ref, uu_ref, Q, R):
@@ -65,9 +242,9 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
     # arrays to store data
 
-    lmbd = np.zeros((ns, TT, max_iters))    # lambdas - costate seq.
-    deltau = np.zeros((ni,TT, max_iters))   # Du - descent direction
-    dJ = np.zeros((ni,TT, max_iters))       # DJ - gradient of J wrt u
+    lmbd = np.zeros((ns, T, max_iters))    # lambdas - costate seq.
+    deltau = np.zeros((ni,T, max_iters))   # Du - descent direction
+    dJ = np.zeros((ni,T, max_iters))       # DJ - gradient of J wrt u
     ll = np.zeros((max_iters-1))
     dl = np.zeros((ns+ni, max_iters-1))
     d2l = np.zeros((ns+ni,ns+ni, max_iters-1))
@@ -75,7 +252,7 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
     J = np.zeros((max_iters))               # collect cost
     dJ = np.zeros((ns+ni,max_iters))
     ddJ = np.zeros((ns+ni, ns+ni, max_iters))
-    direction = np.zeros((ni, TT, max_iters))
+    direction = np.zeros((ni, T, max_iters))
     descent = np.zeros(max_iters)           # collect descent direction
     descent_arm = np.zeros(max_iters)       # collect descent direction
     Qtk = np.zeros((ns, ns, max_iters))
@@ -91,7 +268,7 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         J[kk] = 0
 
         # calculate cost
-        for tt in range(TT-1):
+        for tt in range(T-1):
             temp_cost = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
             J[kk] += temp_cost
 
@@ -99,10 +276,10 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         J[kk] += temp_cost
 
         # Descent direction calculation
-        lmbd_temp = cost_f(xx[:,TT-1,kk], xx_ref[:,TT-1], QT)[1]
-        lmbd[:,TT-1,kk] = lmbd_temp.squeeze()
+        lmbd_temp = cost_f(xx[:,T-1,kk], xx_ref[:,T-1], QT)[1]
+        lmbd[:,T-1,kk] = lmbd_temp.squeeze()
 
-        for tt in reversed(range(TT-1)):                        # integration backward in time
+        for tt in reversed(range(T-1)):                        # integration backward in time
 
             Qtk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,1]
             Rtk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,2]
@@ -137,19 +314,19 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             # temp solution update
 
-            xx_temp = np.zeros((ns,TT))
-            uu_temp = np.zeros((ni,TT))
+            xx_temp = np.zeros((ns,T))
+            uu_temp = np.zeros((ni,T))
 
             xx_temp[:,0] = x0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + stepsize*direction[:,tt,kk]
                 xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
                 JJ_temp += temp_cost
 
@@ -178,19 +355,19 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             # temp solution update
 
-            xx_temp = np.zeros((ns,TT))
-            uu_temp = np.zeros((ni,TT))
+            xx_temp = np.zeros((ns,T))
+            uu_temp = np.zeros((ni,T))
 
             xx_temp[:,0] = x0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + step*direction[:,tt,kk]
                 xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
                 JJ_temp += temp_cost
 
@@ -215,12 +392,12 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         # Update the current solution
 
-        xx_temp = np.zeros((ns,TT))
-        uu_temp = np.zeros((ni,TT))
+        xx_temp = np.zeros((ns,T))
+        uu_temp = np.zeros((ni,T))
 
         xx_temp[:,0] = x0
 
-        for tt in range(TT-1):
+        for tt in range(T-1):
             uu_temp[:,tt] = uu[:,tt,kk] + stepsize*direction[:,tt,kk]
             xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 

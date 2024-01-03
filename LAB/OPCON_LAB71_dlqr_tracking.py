@@ -15,8 +15,6 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 plt.rcParams["figure.figsize"] = (10,8)
 plt.rcParams.update({'font.size': 22})
 
-
-
 from OPCON_LAB72_solver_ltv_LQR import ltv_LQR
 
 ns = 2
@@ -86,10 +84,8 @@ for tt in range(TT-1):
   #
   uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
   xx_p = AA@xx[:,tt] + BB@uu[:, tt]
-  #
-  xx[:,tt+1] = xx_p
-  #
 
+  xx[:,tt+1] = xx_p
 
 #######################################
 # Plots
