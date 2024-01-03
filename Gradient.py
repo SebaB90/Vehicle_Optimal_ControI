@@ -43,7 +43,7 @@ def cost(xx, uu, xx_ref, uu_ref, Q, R):
     return l.squeeze(), lx, lu
 
 def cost_f(xx, xx_ref, QT):
-    
+
     xx = xx[:,None]
     xx_ref = xx_ref[:,None]
 
@@ -134,7 +134,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             if JJ_temp > JJ[kk]  + cc*stepsize*descent_arm[kk]:
                 # update the stepsize
                 stepsize = beta*stepsize
-            
+
             else:
                 print('Armijo stepsize = {:.3e}'.format(stepsize))
                 break
@@ -170,7 +170,6 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             JJ_temp += temp_cost
 
             costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
-
 
         plt.figure(1)
         plt.clf()

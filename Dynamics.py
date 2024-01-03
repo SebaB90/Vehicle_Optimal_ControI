@@ -43,6 +43,5 @@ def dynamics (x, u):
     fu = np.array([[0, 0, 0, dt*(u[1] * np.sin(x[4] - u[0]) - Fy[0] * np.cos(x[4] - u[0]))/m, dt*(Fy[0] * np.sin(x[4] - u[0]) + u[1] * np.cos(x[4] - u[0]))/(m * x[3]),  dt*((u[1] * np.cos(u[0]) - Fy[0] * np.sin(u[0])) *a/Iz)],
                   [0, 0, 0, dt*np.cos(x[4] - u[0])/m, dt*(- np.sin(x[4] - u[0]))/(m * x[3]), dt * np.sin(u[0]) * a/Iz]])
 
-    x_plus = x_plus.squeeze()
 
-    return x_plus, fx, fu
+    return x_plus.squeeze(), fx.squeeze(), fu.squeeze()    

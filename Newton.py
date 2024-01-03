@@ -45,8 +45,8 @@ def cost(xx, uu, xx_ref, uu_ref, Q, R):
     lux = np.zeros((ns, ni))
     lxu = np.zeros((ni, ns))
 
-    hessian = np.block([[lxx, lux], [lxu, luu]])
     gradient = np.concatenate([lx, lu], axis=0)
+    hessian = np.block([[lxx, lux], [lxu, luu]])
 
     return l.squeeze(), gradient.squeeze(), hessian.squeeze() 
 
@@ -57,17 +57,9 @@ def cost_f(xx, xx_ref, QT):
 
     lT = 0.5*(xx - xx_ref).T@QT@(xx - xx_ref)
     lTx = QT@(xx - xx_ref)
-    lTu = np.zeros((ni,1))
-
     lTxx = QT
-    lTuu = np.zeros((ni, ni))
-    lTux = np.zeros((ns, ni))
-    lTxu = np.zeros((ni, ns))
 
-    hessianT = np.block([[lTxx, lTux], [lTxu, lTuu]])
-    gradientT = np.concatenate([lTx, lTu], axis=0)
-
-    return lT.squeeze(), gradientT.squeeze(), hessianT.squeeze()
+    return lT.squeeze(), lTx.squeeze(), lTxx.squeeze()
 
 def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
@@ -83,9 +75,14 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
     J = np.zeros((max_iters))               # collect cost
     dJ = np.zeros((ns+ni,max_iters))
     ddJ = np.zeros((ns+ni, ns+ni, max_iters))
-    direction = np.zeros((ni,TT, max_iters))
+    direction = np.zeros((ni, TT, max_iters))
     descent = np.zeros(max_iters)           # collect descent direction
     descent_arm = np.zeros(max_iters)       # collect descent direction
+    Qtk = np.zeros((ns, ns, max_iters))
+    Rtk = np.zeros((ns, max_iters))
+    Stk = np.zeros((ns, max_iters))
+    QTk = np.zeros((ns, max_iters))
+
 
     x0 = np.copy(xx_ref[:,0])
 
@@ -95,29 +92,22 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         # calculate cost
         for tt in range(TT-1):
-            ll[kk], dl[:,kk], d2l[:,:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)
-            J[kk] += ll[kk]
-            dJ[:,kk] += dl[:,kk] 
-            ddJ[:,:,kk] += d2l[:,:,kk]
+            temp_cost = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
+            J[kk] += temp_cost
 
-        ll[kk], dl[:,kk], d2l[:,:,kk] = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)
-        J[kk] += ll[kk]
-        dJ[:,kk] += dl[:,kk] 
-        ddJ[:,:,kk] += d2l[:,:,kk]
+        temp_cost = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[0]
+        J[kk] += temp_cost
 
-        # Descent direction calculation
-        for tt in reversed(range(TT-1)):
-            dl_norm[kk] = np.linalg.norm(dJ[:,kk]) #[for plots]
-            direction[:,tt,kk] = - np.linalg.inv(ddJ[:,:,kk])@dJ[:,kk]
-
-                
         # Descent direction calculation
         lmbd_temp = cost_f(xx[:,TT-1,kk], xx_ref[:,TT-1], QT)[1]
         lmbd[:,TT-1,kk] = lmbd_temp.squeeze()
 
         for tt in reversed(range(TT-1)):                        # integration backward in time
 
-            Qt = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)
+            Qtk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,1]
+            Rtk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,2]
+            Stk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,1]
+            QTk[:,kk] = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[2]
 
             at, bt = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[1:]
             fx, fu = dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]

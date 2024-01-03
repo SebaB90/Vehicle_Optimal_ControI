@@ -1,49 +1,39 @@
 import numpy as np
-from scipy.optimize import fsolve
+import matplotlib.pyplot as plt
+from scipy.interpolate import PchipInterpolator
 
-
-dt = 1e-3           #sample time
-dx = 1e-3           #infinitesimal increment
-du = 1e-3           #infinitesimal increment
-ns = 6              #number of states
-ni = 2              #number of inputs
-max_iters = 20      #maximum number of iterations for Newton's method
-
-m = 1480    #Kg
-Iz = 1950   #Kg*m^2
-a = 1.421   #m
-b = 1.029   #m
-mi = 1      #nodim
-g = 9.81    #m/s^2
+# Assuming time is the x-axis and x3 is the y-axis data for the green line
 
 TT = int(5e2)          #discrete time samples
-T_mid = TT/2            #half time
-term_cond = 1e-6        #terminal condition
-xx = np.zeros((ns, TT, max_iters))   # state seq.
-uu = np.zeros((ni, TT, max_iters))   # input seq.
-xx_ref = np.zeros((ns, TT))          # state ref.
-uu_ref = np.zeros((ni, TT))          # input ref.
+tt_hor = range(TT)
 
-Qt = np.diag([1, 1, 100, 1, 100, 100])
-Q = Qt
-R = np.diag([1, 0.01])
-xx = xx[:,None]
-uu = uu[:,None]
+time = tt_hor  # Replace with your actual time data
+x3 =     # Replace with your actual x3 data for the green line
 
-xx_ref = xx_ref[:,None]
-uu_ref = uu_ref[:,None]
+# Find the indices where the blue line is constant
+# You would replace the following arrays with the actual constant parts you have identified
+constant_sections_indices = np.array([...])  # Indices of the start of the constant sections
+constant_values = np.array([...])            # The constant values for each section
 
-l = 0.5*(xx - xx_ref).T@Q@(xx - xx_ref) + 0.5*(uu - uu_ref).T@R@(uu - uu_ref)
+# Create the PCHIP Interpolator
+pchip_interpolator = PchipInterpolator(time, x3)
 
-lx = Q@(xx - xx_ref)
-lu = R@(uu - uu_ref)
+# Generate new, smoother time values (denser for plotting)
+time_new = np.linspace(time.min(), time.max(), 500)
 
-lxx = Q
-luu = R
-lux = np.zeros((ns, ni))
-lxu = np.zeros((ni, ns))
+# Compute the smoothed x3 values
+x3_smooth = pchip_interpolator(time_new)
 
-hessian = np.block([[lxx, lux], [lxu, luu]])
-gradient = np.concatenate([lx, lu], axis=0)
+# Overwrite the smoothed values with the original constant values in the constant sections
+for idx, const_value in zip(constant_sections_indices, constant_values):
+    x3_smooth[time_new == idx] = const_value
 
-print(np.shape(gradient), np.shape(lx))
+# Plotting the original and smoothed trajectories
+plt.figure(figsize=(10, 6))
+plt.plot(time, x3, 'g--', label='Original traj_ref[0]')
+plt.plot(time_new, x3_smooth, 'b-', label='Smoothed traj_ref[0]')
+plt.title('Smoothed Trajectory with Constant Sections')
+plt.xlabel('Time')
+plt.ylabel('x3')
+plt.legend()
+plt.show()

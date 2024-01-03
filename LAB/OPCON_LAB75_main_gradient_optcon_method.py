@@ -42,7 +42,7 @@ armijo_maxiters = 20 # number of Armijo iterations
 
 term_cond = 1e-6
 
-visu_armijo = False
+visu_armijo = True
 visu_animation = True
 
 #######################################
