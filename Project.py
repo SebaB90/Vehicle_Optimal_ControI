@@ -13,7 +13,7 @@ from Dynamics import dynamics
 from scipy.optimize import fsolve
 from scipy.interpolate import PchipInterpolator
 from Newton import Newton
-from Gradient import Gradient
+import Gradient as grad
 
 
 # Allow Ctrl-C to work despite plotting
@@ -27,7 +27,7 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 #define params
 
-dt = 1e-3           #sample time
+dt = grad.dt           #sample time
 dx = 1e-3           #infinitesimal increment
 du = 1e-3           #infinitesimal increment
 ns = 6              #number of states
@@ -41,12 +41,13 @@ b = 1.029   #m
 mi = 1      #nodim
 g = 9.81    #m/s^2
 
-TT = int(5e2)          #discrete time samples
-T_mid = TT/2            #half time
-term_cond = 1e-6        #terminal condition
+TT = grad.TT          #discrete time samples
+T = grad.T       #time instants
+T_mid = grad.T_mid            #half time
+term_cond = 1e-6       #terminal condition
 
 plot = True
-Task0 = True
+Task0 = False
 
 if Task0 :
     # defining x and u
@@ -67,7 +68,7 @@ if Task0 :
         total_time = 100                     # Adjust the total simulation time as needed
         num_steps = int(total_time / dt)
 
-        for _ in range(num_steps-1):
+        for i in range(num_steps-1):
             traj = dynamics(traj, u)[0]
             x_traj.append(traj[0])
             y_traj.append(traj[1])
@@ -155,25 +156,25 @@ def equations(vars):
 # FIRST EQUILIBRIUM
 #imposing x3 and x4
 x3 = 1                  
-x4 = 0
+x4 = 0.1
 
 eq[3,0] = np.copy(x3)                           # V
 eq[4,0] = np.copy(x4)                           # beta
 eq[5:,0] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
-eq[2,0] = eq[5,0]                               # psi   
-eq[0,0] =(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))     # x
-eq[1,0] =(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))     # y
+eq[2,0] = eq[5,0]*T_mid                               # psi   
+eq[0,0] = (eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*T_mid     # x
+eq[1,0] = (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
 
 # SECOND EQUILIBRIUM
 x3 = 5                 
-x4 = 0.25
+x4 = 0.2
 
 eq[3,1] = np.copy(x3)
 eq[4,1] = np.copy(x4)
 eq[5:,1] = fsolve(equations, initial_guess)
-eq[2,1] = eq[5,1]*T_mid    
-eq[0,1] = (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))
-eq[1,1] = (eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))
+eq[2,1] = eq[2,0] + eq[5,1]*T_mid    
+eq[0,1] = eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*T_mid
+eq[1,1] = eq[1,0] + (eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*T_mid
 
 
 # Print the result
@@ -182,29 +183,23 @@ print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])
 
 # Design REFERENCE TRAJECTORY  ---------------------------------------------------------------------------------------
 
-traj_ref = np.zeros((ns+ni, TT))
-traj_ref[:,0] = eq[:,0]
+traj_ref = np.zeros((ns+ni, T))
+traj_ref[3:,0] = eq[3:,0]
 
 # Step reference signal - for all the states
-T_mid = int((TT/2))
 
-for tt in range(1,TT):
+for tt in range(1,T):
   
-  traj = dynamics(traj_ref[:,tt-1], traj_ref[6:,tt-1])[0]
+    traj = dynamics(traj_ref[:6,tt-1], traj_ref[6:,tt-1])[0]
+    traj_ref[:3, tt] = traj[:3]
 
-  if tt < TT/2:
-    traj_ref[0, tt] = traj[0]
-    traj_ref[1, tt] = traj[1]
-    traj_ref[2, tt] = traj[2]
-    traj_ref[3:, tt] = eq[3:,0]
+    if tt < T_mid:
+        traj_ref[3:, tt] = eq[3:,0]
 
-  else:
-    traj_ref[0, tt] = traj[0]  
-    traj_ref[1, tt] = traj[1]
-    traj_ref[2, tt] = traj[2]
-    traj_ref[3:, tt] = eq[3:,1]
+    else:  
+        traj_ref[3:, tt] = eq[3:,1]
 
-tt_hor = range(TT)
+tt_hor = range(T)
 
 ####################################################################################################################################
 plt.plot(traj_ref[0,:], traj_ref[1,:], label='Trajectory')
@@ -257,21 +252,21 @@ plt.show()
 # NEWTON'S METHOD evaluation  ----------------------------------------------------------------------------------------
 
 # weight matrices
-Qt = 0.1*np.diag([1, 1, 10, 1, 10, 10])
+Qt = np.diag([1, 1, 10, 1, 10, 10])
 QT = Qt
 Rt = np.diag([10, 1])
 
 # arrays to store data
-xx = np.zeros((ns, TT, max_iters))   # state seq.
-uu = np.zeros((ni, TT, max_iters))   # input seq.
-xx_ref = np.zeros((ns, TT))          # state ref.
-uu_ref = np.zeros((ni, TT))          # input ref.
+xx = np.zeros((ns, T, max_iters))   # state seq.
+uu = np.zeros((ni, T, max_iters))   # input seq.
+xx_ref = np.zeros((ns, T))          # state ref.
+uu_ref = np.zeros((ni, T))          # input ref.
 
 # initial conditions
-xx_init = np.zeros((ns, TT))
-uu_init = np.zeros((ni, TT))
+xx_init = np.zeros((ns, T))
+uu_init = np.zeros((ni, T))
 
-for i in range(0,TT):
+for i in range(0,T):
     xx_init[:,i] = traj_ref[0:6,0]
     uu_init[:,i] = traj_ref[6:,0]
 
@@ -283,7 +278,7 @@ uu[:,:,0] = uu_init
 
 # perform Newton's like method
 if plot:
-    xx, uu, descent, JJ = Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
+    xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
 
     xx_star = xx[:,:,max_iters-1]
     uu_star = uu[:,:,max_iters-1]
@@ -372,12 +367,12 @@ if plot:
 # Perform linear interpolation for reference trajectory
 fig, axs = plt.subplots(8, 1, sharex='all')
 fig.suptitle('Trajectory Smoothing using PCHIP Spline')
-traj_smooth = np.zeros((8,TT))
-x_traj_smooth = np.zeros((8,TT))
+traj_smooth = np.zeros((8,T))
+x_traj_smooth = np.zeros((8,T))
 
 for i in range (ns+ni):
     new_num_points = 7      # Adjust the number of points for a smoother curve
-    interp_indices = np.linspace(0, TT - 1, new_num_points)
+    interp_indices = np.linspace(0, T - 1, new_num_points)
     new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
 
     # define point to create spline
@@ -417,8 +412,8 @@ plt.legend()
 plt.show()
 
 # initial conditions
-xx_init = np.zeros((ns, TT))
-uu_init = np.zeros((ni, TT))
+xx_init = np.zeros((ns, T))
+uu_init = np.zeros((ni, T))
 
 for i in range(0,TT):
     xx_init[:,i] = traj_smooth[0:6,0]

@@ -15,9 +15,11 @@ from Dynamics import dynamics
 #define params
 ns = 6              #number of states
 ni = 2              #number of inputs
+dt = 1e-3           #sample time
 
-TT = int(5e2)          #discrete time samples
-T_mid = TT/2            #half time
+TT = int(1e1)           #discrete time samples
+T = int((TT/dt))
+T_mid = T/2            #half time
 term_cond = 1e-6        #terminal condition
 
 # ARMIJO PARAMETERS
@@ -56,9 +58,9 @@ def cost_f(xx, xx_ref, QT):
 def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
     # arrays to store data
-    lmbd = np.zeros((ns, TT, max_iters))    # lambdas - costate seq.
-    deltau = np.zeros((ni,TT, max_iters))   # Du - descent direction
-    dJ = np.zeros((ni,TT, max_iters))       # DJ - gradient of J wrt u
+    lmbd = np.zeros((ns, T, max_iters))    # lambdas - costate seq.
+    deltau = np.zeros((ni,T, max_iters))   # Du - descent direction
+    dJ = np.zeros((ni,T, max_iters))       # DJ - gradient of J wrt u
     JJ = np.zeros(max_iters)                # collect cost
     descent = np.zeros(max_iters)           # collect descent direction
     descent_arm = np.zeros(max_iters)       # collect descent direction
@@ -69,7 +71,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         JJ[kk] = 0
 
         # calculate cost
-        for tt in range(TT-1):
+        for tt in range(T-1):
             temp_cost = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
             JJ[kk] += temp_cost
 
@@ -77,10 +79,10 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         JJ[kk] += temp_cost
 
         # Descent direction calculation
-        lmbd_temp = cost_f(xx[:,TT-1,kk], xx_ref[:,TT-1], QT)[1]
-        lmbd[:,TT-1,kk] = lmbd_temp.squeeze()
+        lmbd_temp = cost_f(xx[:,T-1,kk], xx_ref[:,T-1], QT)[1]
+        lmbd[:,T-1,kk] = lmbd_temp.squeeze()
 
-        for tt in reversed(range(TT-1)):                        # integration backward in time
+        for tt in reversed(range(T-1)):                        # integration backward in time
 
             at, bt = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[1:]
             fx, fu = dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
@@ -109,19 +111,19 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             # temp solution update
 
-            xx_temp = np.zeros((ns,TT))
-            uu_temp = np.zeros((ni,TT))
+            xx_temp = np.zeros((ns,T))
+            uu_temp = np.zeros((ni,T))
 
             xx_temp[:,0] = x0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
                 xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
                 JJ_temp += temp_cost
 
@@ -150,19 +152,19 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             # temp solution update
 
-            xx_temp = np.zeros((ns,TT))
-            uu_temp = np.zeros((ni,TT))
+            xx_temp = np.zeros((ns,T))
+            uu_temp = np.zeros((ni,T))
 
             xx_temp[:,0] = x0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 uu_temp[:,tt] = uu[:,tt,kk] + step*deltau[:,tt,kk]
                 xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
 
-            for tt in range(TT-1):
+            for tt in range(T-1):
                 temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
                 JJ_temp += temp_cost
 
@@ -185,12 +187,12 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         # Update the current solution
 
-        xx_temp = np.zeros((ns,TT))
-        uu_temp = np.zeros((ni,TT))
+        xx_temp = np.zeros((ns,T))
+        uu_temp = np.zeros((ni,T))
 
         xx_temp[:,0] = x0
 
-        for tt in range(TT-1):
+        for tt in range(T-1):
             uu_temp[:,tt] = uu[:,tt,kk] + stepsize*deltau[:,tt,kk]
             xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
