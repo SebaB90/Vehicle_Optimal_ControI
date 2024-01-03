@@ -45,7 +45,7 @@ TT = int(5e2)          #discrete time samples
 T_mid = TT/2            #half time
 term_cond = 1e-6        #terminal condition
 
-plot = True
+plot = False
 Task0 = False
 
 if Task0 :
@@ -180,7 +180,7 @@ for tt in range(1,TT):
   
   traj = dynamics(traj_ref[:,tt-1], traj_ref[6:,tt-1])[0]
 
-  if tt <= TT/2:
+  if tt < TT/2:
     traj_ref[0, tt] = traj[0]
     traj_ref[1, tt] = traj[1]
     traj_ref[2, tt] = traj[2]
@@ -369,8 +369,8 @@ for i in range (ns+ni):
     new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
 
     # define point to create spline
-    x_spl = np.array([interp_indices[0].astype(int), interp_indices[1].astype(int), interp_indices[2].astype(int), interp_indices[4].astype(int), interp_indices[5].astype(int), interp_indices[6].astype(int)])
-    y_spl = np.array([new_traj_ref_0[0], new_traj_ref_0[0], new_traj_ref_0[0], new_traj_ref_0[-1], new_traj_ref_0[-1], new_traj_ref_0[-1]])
+    x_spl = np.array([interp_indices[0], interp_indices[1], interp_indices[2], interp_indices[4], interp_indices[5], interp_indices[6]])
+    y_spl = np.array([new_traj_ref_0[0], new_traj_ref_0[1], new_traj_ref_0[2], new_traj_ref_0[4], new_traj_ref_0[5], new_traj_ref_0[6]])
 
     # Create a piecewise cubic Hermite interpolating polynomial(PCHIP) interpolation of the given points
     cs = PchipInterpolator(x_spl, y_spl)
