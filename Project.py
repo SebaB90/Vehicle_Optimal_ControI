@@ -45,8 +45,8 @@ TT = int(5e2)          #discrete time samples
 T_mid = TT/2            #half time
 term_cond = 1e-6        #terminal condition
 
-plot = False
-Task0 = False
+plot = True
+Task0 = True
 
 if Task0 :
     # defining x and u
@@ -67,19 +67,31 @@ if Task0 :
         total_time = 100                     # Adjust the total simulation time as needed
         num_steps = int(total_time / dt)
 
-        for _ in range(num_steps):
+        for _ in range(num_steps-1):
             traj = dynamics(traj, u)[0]
             x_traj.append(traj[0])
             y_traj.append(traj[1])
 
         # Plotting the trajectory
+        
+        fig, axs = plt.subplots(3, 1, sharex='all')
 
-        plt.plot(x_traj, y_traj, label='Trajectory')
-        plt.title('Vehicle Trajectory')
-        plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
-        plt.legend()
-        plt.grid(True)
+        axs[0].plot(x_traj, y_traj, 'g', linewidth=2)
+        axs[0].grid()
+        axs[0].set_ylabel('$y$')
+        axs[0].set_xlabel('$x$')
+
+        axs[1].plot(np.linspace(0, TT, num_steps), x_traj, 'g', linewidth=2)
+        axs[1].grid()
+        axs[1].set_ylabel('$x$')
+        
+        axs[2].plot(np.linspace(0, TT, num_steps), y_traj, 'g', linewidth=2)
+        axs[2].grid()
+        axs[2].set_ylabel('$y$')
+        axs[2].set_xlabel('time')
+
+        #fig.align_ylabels(axs)
+
         plt.show()
 
     # Checking derivatives

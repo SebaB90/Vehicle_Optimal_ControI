@@ -40,7 +40,7 @@ def lti_LQR(AA, BB, QQ, RR, QQf, TT):
     BBt = BB
     PPtp = PP[:,:,tt+1]
     
-    PP[:,:,tt] = ... #TODO # fill the gap
+    PP[:,:,tt] = AAt.T@PPtp@AAt - AAt.T@PPtp@BBt@(RRt + BBt.T@PPtp@BBt)**-1 @BBt.T@PPtp@AAt + QQt # fill the gap
   
   # Evaluate KK
   
@@ -52,7 +52,7 @@ def lti_LQR(AA, BB, QQ, RR, QQf, TT):
     BBt = BB
     PPtp = PP[:,:,tt+1]
     
-    KK[:,:,tt] = ... #TODO # fill the gap
+    KK[:,:,tt] =  -(RRt+ (BBt.T@PPtp@BBt))**-1 *BBt.T@PPtp@AAt # fill the gap
 
   return KK, PP
     
