@@ -12,7 +12,7 @@ dt = 1e-3   #sample time
 ns = 6      #number of states
 ni = 2      #number of inputs
 
-TT = int(1e1)          #discrete time samples
+TT = int(10)          #discrete time samples
 T = int((TT/dt))       #time instants
 T_mid = int(T/2)       #half time
 
@@ -49,4 +49,4 @@ def dynamics (x, u):
                   [0, 0, 0, dt*np.cos(x[4] - u[0])/m, dt*(- np.sin(x[4] - u[0]))/(m * x[3]), dt * np.sin(u[0]) * a/Iz]])
 
 
-    return x_plus.squeeze(), fx.squeeze(), fu.squeeze()    
+    return x_plus.squeeze(), fx, fu

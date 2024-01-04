@@ -22,186 +22,166 @@ T_mid = dyn.T_mid       #half time
 term_cond = 1e-6        #terminal condition
 
 # ARMIJO PARAMETERS
-cc = 0.5
+c = 0.5
 beta = 0.7
 armijo_maxiters = 20    # number of Armijo iterations
 stepsize_0 = 1          # initial stepsize
 
 
-def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = None, qqfin = None):
+def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None, qqfin = None, ccin = None):
 
-  """
-	LQR for LTV system with (time-varying) affine cost
-	
-  Args
-    - AAin (nn x nn (x TT)) matrix
-    - BBin (nn x mm (x TT)) matrix
-    - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
-    - QQfin (nn x nn) terminal cost
-    - qq (nn x (x TT)) affine terms
-    - rr (mm x (x TT)) affine terms
-    - qqf (nn x (x TT)) affine terms - final cost
-    - TT time horizon
-  Return
-    - KK (mm x nn x TT) optimal gain sequence
-    - PP (nn x nn x TT) riccati matrix
-  """
-	
-  try:
-    # check if matrix is (.. x .. x TT) - 3 dimensional array 
-    ns, lA = AAin.shape[1:]
-  except:
-    # if not 3 dimensional array, make it (.. x .. x 1)
-    AAin = AAin[:,:,None]
-    ns, lA = AAin.shape[1:]
+    """
+        LQR for LTV system with (time-varying) affine cost
+        
+    Args
+        - AAin (nn x nn (x TT)) matrix
+        - BBin (nn x mm (x TT)) matrix
+        - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
+        - QQfin (nn x nn) terminal cost
+        - qq (nn x (x TT)) affine terms
+        - rr (mm x (x TT)) affine terms
+        - qqf (nn x (x TT)) affine terms - final cost
+        - TT time horizon
+    Return
+        - KK (mm x nn x TT) optimal gain sequence
+        - PP (nn x nn x TT) riccati matrix
+    """
+        
+    try:
+        # check if matrix is (.. x .. x TT) - 3 dimensional array 
+        ns, lA = AAin.shape[1:]
+    except:
+        # if not 3 dimensional array, make it (.. x .. x 1)
+        AAin = AAin[:,:,None]
+        ns, lA = AAin.shape[1:]
 
-  try:  
-    ni, lB = BBin.shape[1:]
-  except:
-    BBin = BBin[:,:,None]
-    ni, lB = BBin.shape[1:]
+    try:  
+        ni, lB = BBin.shape[1:]
+    except:
+        BBin = BBin[:,:,None]
+        ni, lB = BBin.shape[1:]
 
-  try:
-      nQ, lQ = QQin.shape[1:]
-  except:
-      QQin = QQin[:,:,None]
-      nQ, lQ = QQin.shape[1:]
+    try:
+        nQ, lQ = QQin.shape[1:]
+    except:
+        QQin = QQin[:,:,None]
+        nQ, lQ = QQin.shape[1:]
 
-  try:
-      nR, lR = RRin.shape[1:]
-  except:
-      RRin = RRin[:,:,None]
-      nR, lR = RRin.shape[1:]
+    try:
+        nR, lR = RRin.shape[1:]
+    except:
+        RRin = RRin[:,:,None]
+        nR, lR = RRin.shape[1:]
 
-  try:
-      nSi, nSs, lS = SSin.shape
-  except:
-      SSin = SSin[:,:,None]
-      nSi, nSs, lS = SSin.shape
+    try:
+        nSi, nSs, lS = SSin.shape
+    except:
+        SSin = SSin[:,:,None]
+        nSi, nSs, lS = SSin.shape
 
-  # Check dimensions consistency -- safety
-  if nQ != ns:
-    print("Matrix Q does not match number of states")
-    exit()
-  if nR != ni:
-    print("Matrix R does not match number of inputs")
-    exit()
-  if nSs != ns:
-    print("Matrix S does not match number of states")
-    exit()
-  if nSi != ni:
-    print("Matrix S does not match number of inputs")
-    exit()
+    # Check dimensions consistency -- safety
+    if nQ != ns:
+        print("Matrix Q does not match number of states")
+        exit()
+    if nR != ni:
+        print("Matrix R does not match number of inputs")
+        exit()
+    if nSs != ns:
+        print("Matrix S does not match number of states")
+        exit()
+    if nSi != ni:
+        print("Matrix S does not match number of inputs")
+        exit()
 
 
-  if lA < TT:
-    AAin = AAin.repeat(TT, axis=2)
-  if lB < TT:
-    BBin = BBin.repeat(TT, axis=2)
-  if lQ < TT:
-    QQin = QQin.repeat(TT, axis=2)
-  if lR < TT:
-    RRin = RRin.repeat(TT, axis=2)
-  if lS < TT:
-    SSin = SSin.repeat(TT, axis=2)
+    if lA < T:
+        AAin = AAin.repeat(T, axis=2)
+    if lB < T:
+        BBin = BBin.repeat(T, axis=2)
+    if lQ < T:
+        QQin = QQin.repeat(T, axis=2)
+    if lR < T:
+        RRin = RRin.repeat(T, axis=2)
+    if lS < T:
+        SSin = SSin.repeat(T, axis=2)
 
-  # Check for affine terms
+    # Check for affine terms
 
-  augmented = False
+    augmented = False
 
-  if qqin is not None or rrin is not None or qqfin is not None:
-    augmented = True
-    print("Augmented term!")
+    if qqin is not None or rrin is not None or qqfin is not None or ccin is not None:
+        augmented = True
+        print("Augmented term!")
 
-  KK = np.zeros((ni, ns, TT))
-  sigma = np.zeros((ni, TT))
-  PP = np.zeros((ns, ns, TT))
-  pp = np.zeros((ns, TT))
+    KK = np.zeros((ni, ns, T))
+    sigma = np.zeros((ni, T))
+    PP = np.zeros((ns, ns, T))
+    pp = np.zeros((ns, T))
 
-  QQ = QQin
-  RR = RRin
-  SS = SSin
-  QQf = QQfin
-  
-  qq = qqin
-  rr = rrin
-
-  qqf = qqfin
-
-  AA = AAin
-  BB = BBin
-
-  xx = np.zeros((ns, TT))
-  uu = np.zeros((ni, TT))
-
-  xx[:,0] = x0
-  
-  PP[:,:,-1] = QQf
-  pp[:,-1] = qqf
-  
-  # Solve Riccati equation
-  for tt in reversed(range(TT-1)):
-    QQt = QQ[:,:,tt]
-    qqt = qq[:,tt][:,None]
-    RRt = RR[:,:,tt]
-    rrt = rr[:,tt][:,None]
-    AAt = AA[:,:,tt]
-    BBt = BB[:,:,tt]
-    SSt = SS[:,:,tt]
-    PPtp = PP[:,:,tt+1]
-    pptp = pp[:, tt+1][:,None]
-
-    MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
-    mmt = rrt + BBt.T @ pptp
+    QQ = QQin
+    RR = RRin
+    SS = SSin
+    QQf = QQfin
     
-    PPt = AAt.T @ PPtp @ AAt - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ (BBt.T@PPtp@AAt + SSt) + QQt
-    ppt = AAt.T @ pptp - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ mmt + qqt
+    qq = qqin
+    rr = rrin
+    cc = ccin
 
-    PP[:,:,tt] = PPt
-    pp[:,tt] = ppt.squeeze()
+    qqf = qqfin
 
-  # Evaluate KK
-  
-  for tt in range(TT-1):
-    QQt = QQ[:,:,tt]
-    qqt = qq[:,tt][:,None]
-    RRt = RR[:,:,tt]
-    rrt = rr[:,tt][:,None]
-    AAt = AA[:,:,tt]
-    BBt = BB[:,:,tt]
-    SSt = SS[:,:,tt]
+    AA = AAin
+    BB = BBin
 
-    PPtp = PP[:,:,tt+1]
-    pptp = pp[:,tt+1][:,None]
+    xx = np.zeros((ns, T))
+    uu = np.zeros((ni, T))
 
-    # Check positive definiteness
+    xx[:,0] = x0
+    
+    PP[:,:,-1] = QQf
+    pp[:,-1] = qqf
 
-    MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
-    mmt = rrt + BBt.T @ pptp
+    # Evaluate KK and PP
+    
+    for tt in reversed(range(T-1)):
+        QQt = QQ[:,:,tt]
+        qqt = qq[:,tt][:,None]
+        RRt = RR[:,:,tt]
+        rrt = rr[:,tt][:,None]
+        AAt = AA[:,:,tt]
+        BBt = BB[:,:,tt]
+        SSt = SS[:,:,tt]
+        PPtp = PP[:,:,tt+1]
+        pptp = pp[:,tt+1][:,None]
+        cct = cc[:,tt][:,None]
 
-    # for other purposes we could add a regularization step here...
+        # Evaluate K
 
-    KK[:,:,tt] = -MMt_inv@(BBt.T@PPtp@AAt + SSt)
-    sigma_t = -MMt_inv@mmt
+        KKt =  -(RRt+BBt.T@PPtp@BBt)**-1 @(SSt+BBt.T@PPtp@AAt)
+        sigma_t = -(RRt+BBt.T@PPtp@BBt)**-1 @(rrt+BBt.T@pptp+BBt.T@PPtp@cct)
 
-    sigma[:,tt] = sigma_t.squeeze()
+        KK[:,:,tt] = KKt
+        sigma[:,tt] = sigma_t.squeeze()
 
+        # Solve Riccati Equation
 
-  for tt in range(TT - 1):
-    # Trajectory
+        ppt = qqt + AAt.T@pptp + AAt.T@PPtp@cct + KKt.T@(RRt + BBt.T@PPtp@BBt)@sigma_t
+        PPt = QQt + AAt.T@PPtp@AAt - KKt.T@(RRt + BBt.T@PPtp@BBt)@KKt
 
-    uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
-    xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
-
-    xx[:,tt+1] = xx_p
-
-    xxout = xx
-    uuout = uu
-
-  return KK, sigma, PP, xxout, uuout
+        PP[:,:,tt] = PPt
+        pp[:,tt] = ppt.squeeze()
 
 
+    for tt in range(T - 1):
+        # Trajectory
+        uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
+        xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
 
+        xx[:,tt+1] = xx_p
+
+        xxout = xx
+        uuout = uu
+
+    return xxout, uuout, sigma, KK
 
 
 def cost(xx, uu, xx_ref, uu_ref, Q, R):
@@ -219,13 +199,9 @@ def cost(xx, uu, xx_ref, uu_ref, Q, R):
 
     lxx = Q
     luu = R
-    lux = np.zeros((ns, ni))
-    lxu = np.zeros((ni, ns))
+    lux = np.zeros((ni, ns))
 
-    gradient = np.concatenate([lx, lu], axis=0)
-    hessian = np.block([[lxx, lux], [lxu, luu]])
-
-    return l.squeeze(), gradient.squeeze(), hessian.squeeze() 
+    return l.squeeze(), lx.squeeze(), lu.squeeze(), lxx.squeeze(), luu.squeeze(), lux.squeeze()
 
 def cost_f(xx, xx_ref, QT):
     
@@ -238,42 +214,67 @@ def cost_f(xx, xx_ref, QT):
 
     return lT.squeeze(), lTx.squeeze(), lTxx.squeeze()
 
-def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
+
+def Newton (xx_ref, uu_ref, max_iters):
 
     # arrays to store data
+    xx = np.zeros((ns, T, max_iters))   # state seq.
+    uu = np.zeros((ni, T, max_iters))   # input seq.
 
-    lmbd = np.zeros((ns, T, max_iters))    # lambdas - costate seq.
+    A = np.zeros((ns, ns, T))
+    B = np.zeros((ns, ni, T))
+    d1l = np.zeros((ns, T))
+    d2l = np.zeros((ni, T))
+    d11l = np.zeros((ns, ns, T))
+    d22l = np.zeros((ni, ni, T))
+    d12l = np.zeros((ni, ns, T))
+    cc = np.zeros((ns,T-1))
+
+    Qtilda = np.zeros((ns, ns, T))
+    Rtilda = np.zeros((ni, ni, T))
+    Stilda = np.zeros((ni, ns, T))
+    
+    lmbd = np.zeros((ns, T, max_iters)) # lambdas - costate seq.
+
     deltau = np.zeros((ni,T, max_iters))   # Du - descent direction
     dJ = np.zeros((ni,T, max_iters))       # DJ - gradient of J wrt u
-    ll = np.zeros((max_iters-1))
-    dl = np.zeros((ns+ni, max_iters-1))
-    d2l = np.zeros((ns+ni,ns+ni, max_iters-1))
-    dl_norm = np.zeros(max_iters-1)         #[for plots]
-    J = np.zeros((max_iters))               # collect cost
-    dJ = np.zeros((ns+ni,max_iters))
-    ddJ = np.zeros((ns+ni, ns+ni, max_iters))
-    direction = np.zeros((ni, T, max_iters))
+    J = np.zeros(max_iters)                # collect cost
     descent = np.zeros(max_iters)           # collect descent direction
-    descent_arm = np.zeros(max_iters)       # collect descent direction
-    Qtk = np.zeros((ns, ns, max_iters))
-    Rtk = np.zeros((ns, max_iters))
-    Stk = np.zeros((ns, max_iters))
-    QTk = np.zeros((ns, max_iters))
+    descent_arm = np.zeros(max_iters)       # collect descent direction     
 
+    Dx = np.zeros((ns, T, max_iters))
+    Du = np.zeros((ni, T, max_iters))
+    
+    # initial conditions
+    for i in range(0,T):
+        xx[:,i,0] = xx_ref[:,0]
+        uu[:,i,0] = uu_ref[:,0]
+
+    # Weight matrices
+    Qt = np.diag([1, 1, 10, 1, 10, 10])
+    QT = Qt
+    Rt = np.diag([10, 1])
+    S = np.zeros((ni,ns))
 
     x0 = np.copy(xx_ref[:,0])
-
+    ################################################################################################################
+    
     for kk in range(max_iters-1):
 
         J[kk] = 0
 
-        # calculate cost
+        # Parameters evaluation
+
         for tt in range(T-1):
-            temp_cost = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
+            temp_cost= cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Qt, Rt)[0]
             J[kk] += temp_cost
+            fx, fu = dyn.dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
+            A[:,:,tt] = fx.T
+            B[:,:,tt] = fu.T
 
         temp_cost = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[0]
         J[kk] += temp_cost
+
 
         # Descent direction calculation
         lmbd_temp = cost_f(xx[:,T-1,kk], xx_ref[:,T-1], QT)[1]
@@ -281,35 +282,36 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         for tt in reversed(range(T-1)):                        # integration backward in time
 
-            Qtk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,1]
-            Rtk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,2]
-            Stk[:,kk] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[2][1,1]
-            QTk[:,kk] = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[2]
+            d1l[:,tt], d2l[:,tt] = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Qt, Rt)[1:3]           
 
-            at, bt = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Q, R)[1:]
-            fx, fu = dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
-
-            At = fx.T
-            Bt = fu.T
-
-            lmbd_temp = At.T@lmbd[:,tt+1,kk][:,None] + at       # costate equation
-            dJ_temp = Bt.T@lmbd[:,tt+1,kk][:,None] + bt         # gradient of J wrt u
-            deltau_temp = - dJ_temp
+            lmbd_temp = A[:,:,tt].T@lmbd[:,tt+1,kk] + d1l[:,tt]       # costate equation
+            dJ_temp = B[:,:,tt].T@lmbd[:,tt+1,kk] + d2l[:,tt]         # gradient of J wrt u
 
             lmbd[:,tt,kk] = lmbd_temp.squeeze()
             dJ[:,tt,kk] = dJ_temp.squeeze()
-            deltau[:,tt,kk] = deltau_temp.squeeze()
-
+            
             descent[kk] += deltau[:,tt,kk].T@deltau[:,tt,kk]
             descent_arm[kk] += dJ[:,tt,kk].T@deltau[:,tt,kk]
 
+        print ('d1lllllllllllll', d1l,'d22222222222222222222222', d2l)
+        # Matrices evaluation
+        for tt in range(T):
+            Qtilda[:,:,tt], Rtilda[:,:,tt], Stilda[:,:,tt] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Qt, Rt)[3:]
+        
+        d1lT, QTilda = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[1:3]
+
+        Dx[:,:,kk], Du[:,:,kk], sigma, K = ltv_LQR(A, B, Qtilda, Rtilda, Stilda, QTilda, T, x0, d1l, d2l, d1lT, cc)
+
+        for tt in reversed(range(T-1)): 
+            descent[kk] += Du[:,tt,kk].T@Du[:,tt,kk]
+            descent_arm[kk] += dJ[:,tt,kk].T@Du[:,tt,kk]    
 
         # Stepsize selection - ARMIJO
         stepsizes = []  # list of stepsizes
         costs_armijo = []
 
         stepsize = stepsize_0
-
+        
         for ii in range(armijo_maxiters):
 
             # temp solution update
@@ -320,14 +322,14 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             xx_temp[:,0] = x0
 
             for tt in range(T-1):
-                uu_temp[:,tt] = uu[:,tt,kk] + stepsize*direction[:,tt,kk]
-                xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+                uu_temp[:,tt] = uu[:,tt,kk] + stepsize*Du[:,tt,kk]
+                xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
 
             for tt in range(T-1):
-                temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
+                temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Qt, Rt)[0]
                 JJ_temp += temp_cost
 
             temp_cost = cost_f(xx_temp[:,-1], xx_ref[:,-1], QT)[0]
@@ -336,14 +338,14 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             stepsizes.append(stepsize)                              # save the stepsize
             costs_armijo.append(np.min([JJ_temp, 100*J[kk]]))       # save the cost associated to the stepsize
 
-            if JJ_temp > J[kk]  + cc*stepsize*dJ[:,kk].T@direction:
+            if JJ_temp > J[kk]  + c*stepsize*descent_arm[kk]:
                 # update the stepsize
                 stepsize = beta*stepsize
             
             else:
                 print('Armijo stepsize = {:.3e}'.format(stepsize))
                 break
-
+        
         # Armijo plot
 
         steps = np.linspace(0,stepsize_0,int(2e1))
@@ -361,14 +363,14 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
             xx_temp[:,0] = x0
 
             for tt in range(T-1):
-                uu_temp[:,tt] = uu[:,tt,kk] + step*direction[:,tt,kk]
-                xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+                uu_temp[:,tt] = uu[:,tt,kk] + step*Du[:,tt,kk]
+                xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
             # temp cost calculation
             JJ_temp = 0
 
             for tt in range(T-1):
-                temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
+                temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Qt, Rt)[0]
                 JJ_temp += temp_cost
 
             temp_cost = cost_f(xx_temp[:,-1], xx_ref[:,-1], QT)[0]
@@ -380,9 +382,9 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         plt.figure(1)
         plt.clf()
         plt.plot(steps, costs, color='g', label='$\\ell(x^k - \\gamma*d^k$)')
-        plt.plot(steps, J[kk] + dJ[:,kk].T@direction*steps, color='r', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k$')
-        plt.plot(steps, J[kk] + dJ[:,kk].T@direction*steps + 1/2*direction.T@ddJ[:,:,kk]@direction*steps**2, color='b', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k - \\gamma^2 d^{k\\top}\\nabla^2\\ell(x^k) d^k$')
-        plt.plot(steps, ll[kk] + cc*dl[:,kk].T@direction*steps, color='g', linestyle='dashed', label='$\\ell(x^k) - \\gamma*c*\\nabla\\ell(x^k)^{\\top}d^k$')
+        plt.plot(steps, J[kk] + descent_arm[kk]*steps, color='r', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k$')
+      # plt.plot(steps, J[kk] + dJ[:,kk].T@Du[:,kk]*steps + 1/2*Du[:,kk].T@ddJ[:,:,kk]@Du[:,kk]*steps**2, color='b', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k - \\gamma^2 d^{k\\top}\\nabla^2\\ell(x^k) d^k$')
+        plt.plot(steps, J[kk] + c*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$\\ell(x^k) - \\gamma*c*\\nabla\\ell(x^k)^{\\top}d^k$')
         plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
         plt.grid()
         plt.xlabel('stepsize')
@@ -398,18 +400,20 @@ def Newton (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         xx_temp[:,0] = x0
 
         for tt in range(T-1):
-            uu_temp[:,tt] = uu[:,tt,kk] + stepsize*direction[:,tt,kk]
-            xx_temp[:,tt+1] = dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+            uu_temp[:,tt] = uu[:,tt,kk] + stepsize*Du[:,tt,kk]
+            xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
         xx[:,:,kk+1] = xx_temp
         uu[:,:,kk+1] = uu_temp
 
         # Termination condition
 
-        print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,np.linalg.norm(direction)[kk], J[kk]))
+        print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,descent[kk], J[kk]))
 
-        if np.linalg.norm(direction)[kk] <= term_cond:
+        if descent[kk] <= term_cond:
             max_iters = kk
             break
 
-    return xx, uu, np.linalg.norm(direction), J
+    return xx, uu, descent, J
+
+

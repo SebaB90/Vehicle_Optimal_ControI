@@ -260,97 +260,30 @@ uu = np.zeros((ni, T, max_iters))   # input seq.
 xx_ref = np.zeros((ns, T))          # state ref.
 uu_ref = np.zeros((ni, T))          # input ref.
 
-# initial conditions
-xx_init = np.zeros((ns, T))
-uu_init = np.zeros((ni, T))
-
-for i in range(0,T):
-    xx_init[:,i] = traj_ref[0:6,0]
-    uu_init[:,i] = traj_ref[6:,0]
 
 xx_ref = traj_ref[0:6,:]
 uu_ref = traj_ref[6:,:]
 
-xx[:,:,0] = xx_init
-uu[:,:,0] = uu_init
 
-fx, fu = dyn.dynamics(xx_init[:,0], uu_init[:,0])[1:]
-A = fx.T
-B = fu.T
+'''
+####################################################################################
+# initial conditions
+for i in range(0,T):
+    xx[:,i,0] = xx_ref[:,0]
+    uu[:,i,0] = uu_ref[:,0]
 
-# weight matrices
+# Weight matrices
 Qt = np.diag([1, 1, 10, 1, 10, 10])
 QT = Qt
 Rt = np.diag([10, 1])
 S = np.zeros((ni,ns))
-
-# Affine terms (for tracking)
-q = np.zeros((ns,T))
-r = np.zeros((ni,T))
-
-for tt in range(T):
-    q_temp = -Qt@xx_ref[:,tt]
-    q[:,tt] = q_temp.squeeze()
-
-qf =  -QT@xx_ref[:,-1]
-
-KK,sigma,_,xx,uu = nwtn.ltv_LQR(A, B, Qt, Rt, S, QT, T, xx_init[:,0], q, r, qf)
-
-################################################################################################
+xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
+#################################################################################
 '''
-tt_hor = range(T)
-
-fig, axs = plt.subplots(8, 1, sharex='all')
-
-axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
-axs[0].plot(tt_hor, xx[0,:], linewidth=2)
-axs[0].grid()
-axs[0].set_ylabel('$x1$')
-
-axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
-axs[1].plot(tt_hor, xx[1,:], linewidth=2)
-axs[1].grid()
-axs[1].set_ylabel('$x_$')
-
-axs[2].plot(tt_hor, xx_ref[2,:], 'g--', linewidth=2)
-axs[2].plot(tt_hor, xx[2,:], linewidth=2)
-axs[2].grid()
-axs[2].set_ylabel('$x3$')
-
-axs[3].plot(tt_hor, xx_ref[3,:], 'g--', linewidth=2)
-axs[3].plot(tt_hor, xx[3,:], linewidth=2)
-axs[3].grid()
-axs[3].set_ylabel('$x_1$')
-
-axs[4].plot(tt_hor, xx_ref[4,:], 'g--', linewidth=2)
-axs[4].plot(tt_hor, xx[4,:], linewidth=2)
-axs[4].grid()
-axs[4].set_ylabel('$x_2$')
-
-axs[5].plot(tt_hor, xx_ref[5,:], 'g--', linewidth=2)
-axs[5].plot(tt_hor, xx[5,:], linewidth=2)
-axs[5].grid()
-axs[5].set_ylabel('$u$')
-
-axs[6].plot(tt_hor, uu[0,:],'r', linewidth=2)
-axs[6].grid()
-axs[6].set_ylabel('$u0$')
-
-axs[7].plot(tt_hor, uu[1,:],'r', linewidth=2)
-axs[7].grid()
-axs[7].set_ylabel('$u1$')
-axs[7].set_xlabel('time')
-
-fig.align_ylabels(axs)
-
-plt.show()
-'''
-#####################################################################################################
-
 
 # perform Newton's like method
-if plot:
-    xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
+if 1:
+    xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
     xx_star = xx[:,:,max_iters-1]
     uu_star = uu[:,:,max_iters-1]
@@ -375,7 +308,7 @@ if plot:
     plt.show(block=False)
 
 # Design OPTIMAL TRAJECTORY  ---------------------------------------------------------------------------------------
-if plot:
+if 1:
     fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
     axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
@@ -490,6 +423,7 @@ axs[7].set_ylabel('$F$')
 plt.legend()
 plt.show()
 
+# NEWTON'S METHOD evaluation  ----------------------------------------------------------------------------------------
 # arrays to store data
 xx = np.zeros((ns, T, max_iters))   # state seq.
 uu = np.zeros((ni, T, max_iters))   # input seq.
