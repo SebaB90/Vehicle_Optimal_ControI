@@ -19,7 +19,7 @@ dt = dyn.dt  # sample time
 
 TT = dyn.tf  # Final time in seconds
 T = dyn.TT  # Number of discrete-time samples
-TT_mid = dyn.TT_mid
+T_mid = dyn.TT_mid
 term_cond = 1e-6        #terminal condition
 
 # ARMIJO PARAMETERS
@@ -65,6 +65,8 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
     descent = np.zeros(max_iters)           # collect descent direction
     descent_arm = np.zeros(max_iters)       # collect descent direction
     x0 = np.copy(xx_ref[:,0])
+
+    kk = 0
 
     for kk in range(max_iters-1):
 
@@ -173,7 +175,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
 
-
+        print('\nJJ(k)\n',JJ[kk],'\ndescent arm\n',descent_arm[kk],'\ndJ\n',dJ[:,:,kk],'\ndeltau\n',deltau[:,:,kk])
         plt.figure(1)
         plt.clf()
         plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')

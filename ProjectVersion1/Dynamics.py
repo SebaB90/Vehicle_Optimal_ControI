@@ -163,6 +163,12 @@ def dynamics(xx, uu):
         # Derivative of dynamics w.r.t. input (fu)
         fu[0,0] = 0
 
+        #df2
+        fx[0,1] = dt*-gg / ll * np.cos(xx[0,0])
+        fx[1,1] = 1 + dt*(- kk / (mm * ll))
+
+        fu[0,1] = dt / (mm * (ll ** 2))
+
         # Removing singleton dimensions for the next state
         xxp = xxp.squeeze()
        

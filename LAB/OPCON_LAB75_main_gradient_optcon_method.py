@@ -67,7 +67,7 @@ ref_deg_T = 30
 #
 # 
 
-step_reference = False
+step_reference = True
 
 xx_ref = np.zeros((ns, TT))
 uu_ref = np.zeros((ni, TT))
@@ -155,8 +155,6 @@ kk = 0
 xx[:,:,0] = xx_init
 uu[:,:,0] = uu_init
 
-print(np.shape(xx), np.shape(xx_ref))
-
 for kk in range(max_iters-1):
 
   JJ[kk] = 0
@@ -180,6 +178,7 @@ for kk in range(max_iters-1):
 
     at, bt = cst.stagecost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[1:]
     fx, fu = dyn.dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
+    print(fx,'\n\n',fu)
 
     At = fx.T
     Bt = fu.T
@@ -280,7 +279,7 @@ for kk in range(max_iters-1):
 
       costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
 
-
+    print('\nJJ(k)\n',JJ[kk],'\ndescent arm\n',descent_arm[kk],'\ndJ\n',dJ[:,:,kk],'\ndeltau\n',deltau[:,:,kk])
     plt.figure(1)
     plt.clf()
 

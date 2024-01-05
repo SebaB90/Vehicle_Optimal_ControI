@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 from scipy.integrate import solve_ivp
 from scipy.interpolate import PchipInterpolator
+import sys
 import Dynamics as dyn
 import Costs as cst
 import Newton as nwtn
@@ -24,7 +25,6 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 ########################################################################
 ###################### TASK 0: DISCRETIZATION #########################
 ########################################################################
-
 
 ############################################################
 # Algorithm parameters
@@ -75,7 +75,6 @@ dJ = np.zeros((ni,TT, max_iters))  # DJ - gradient of J wrt u
 JJ = np.zeros(max_iters)  # collect cost
 descent = np.zeros(max_iters)  # collect descent direction
 descent_arm = np.zeros(max_iters)  # collect descent direction
-
 
 ############################################################
 # TESTS
@@ -388,22 +387,10 @@ uu_init = np.zeros((ni, TT))
 #####################################################################
 # NEWTON'S METHOD evaluation  
 #####################################################################
-    
-# xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
-####################################################################################à
 
-xx = np.zeros((ns, TT, max_iters))   # state seq.
-uu = np.zeros((ni, TT, max_iters))   # input seq.
+xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
-# initial conditions
-for i in range(0,TT):
-    xx[:,i,0] = xx_ref[:,0]
-    uu[:,i,0] = uu_ref[:,0]
-
-xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, cst.QQt, cst.RRt, cst.QQT, max_iters)
-
-#####################################################################################
 xx_star = xx[:,:,max_iters-1]
 uu_star = uu[:,:,max_iters-1]
 uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
@@ -502,7 +489,8 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-
+if ns == 2:
+    sys.exit()
 ########################################################################
 ############## TASK 2: TRAJECTORY GENERATION (II) ######################
 ########################################################################
@@ -564,6 +552,7 @@ axs[6].set_ylabel('$delta$')
 axs[7].set_ylabel('$F$')
 plt.legend()
 plt.show()
+
 
 #####################################################################
 # NEWTON'S METHOD evaluation  
