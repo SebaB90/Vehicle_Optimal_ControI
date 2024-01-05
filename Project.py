@@ -280,7 +280,7 @@ S = np.zeros((ni,ns))
 xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
 #################################################################################
 '''
-
+'''
 # perform Newton's like method
 if 1:
     xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
@@ -362,7 +362,7 @@ if 1:
     plt.legend()
     plt.grid(True)
     plt.show()
-
+'''
 #########################################
 ##### TASK 2: TRAJECTORY GENERATION II ##
 #########################################
@@ -422,6 +422,7 @@ axs[6].set_ylabel('$delta$')
 axs[7].set_ylabel('$F$')
 plt.legend()
 plt.show()
+
 
 # NEWTON'S METHOD evaluation  ----------------------------------------------------------------------------------------
 # arrays to store data
