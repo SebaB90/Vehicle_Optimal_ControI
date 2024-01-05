@@ -498,10 +498,10 @@ plt.show()
 ############################################################
 
 # Perform linear interpolation for reference trajectory
-fig, axs = plt.subplots(8, 1, sharex='all')
+fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 fig.suptitle('Trajectory Smoothing using PCHIP Spline')
-traj_smooth = np.zeros((8,T))
-x_traj_smooth = np.zeros((8,T))
+traj_smooth = np.zeros((ns+ni,TT))
+x_traj_smooth = np.zeros((ns+ni,TT))
 
 axs[0].plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original Reference Trajectory')
 axs[0].grid()
@@ -512,7 +512,7 @@ axs[2].grid()
 
 for i in range (3,ns+ni):
     new_num_points = 7      # Adjust the number of points for a smoother curve
-    interp_indices = np.linspace(0, T - 1, new_num_points)
+    interp_indices = np.linspace(0, TT - 1, new_num_points)
     new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
 
     # define point to create spline
@@ -523,7 +523,7 @@ for i in range (3,ns+ni):
     cs = PchipInterpolator(x_spl, y_spl)
 
     # Generate new, smoother x values (denser for plotting)
-    x_spl_new = np.linspace(min(x_spl), max(x_spl), T)
+    x_spl_new = np.linspace(min(x_spl), max(x_spl), TT)
 
     # Compute the smoothed y values
     y_spl_new = cs(x_spl_new)
@@ -556,8 +556,8 @@ plt.show()
 #####################################################################
 
 # arrays to store data
-xx = np.zeros((ns, T, max_iters))   # state seq.
-uu = np.zeros((ni, T, max_iters))   # input seq.
+xx = np.zeros((ns, TT, max_iters))   # state seq.
+uu = np.zeros((ni, TT, max_iters))   # input seq.
 
 xx_ref = traj_smooth[0:6,:]
 uu_ref = traj_smooth[6:,:]
@@ -648,12 +648,12 @@ plt.show()
 ##################### TASK 3: TRAJECTORY VIA LQR ######################
 #######################################################################
 
-A_opt = np.zeros((ns, ns, T))
-B_opt = np.zeros((ns, ni, T))
-Qt_reg = np.zeros((ns, ns, T))
-Rt_reg = np.zeros((ni, ni, T))
+A_opt = np.zeros((ns, ns, TT))
+B_opt = np.zeros((ns, ni, TT))
+Qt_reg = np.zeros((ns, ns, TT))
+Rt_reg = np.zeros((ni, ni, TT))
 
-for tt in range (T):
+for tt in range (TT):
     fx, fu = dyn.dynamics(xx_star[:,tt], uu_star[:,tt])[1:]
 
     A_opt[:,:,tt] = fx.T
@@ -662,10 +662,10 @@ for tt in range (T):
     Qt_reg[:,:,tt] = 0.1*np.diag([1, 1, 100, 1, 100, 100])
     Rt_reg[:,:,tt] = 0.01*np.diag([100, 1])
 
-QT_reg = Qt_reg[:,:,T]
+QT_reg = Qt_reg[:,:,TT]
 
     
-def lti_LQR(AA, BB, QQ, RR, QQf, T):
+def lti_LQR(AA, BB, QQ, RR, QQf, TT):
 
     """
         LQR for LTI system with fixed cost	
@@ -714,14 +714,14 @@ def lti_LQR(AA, BB, QQ, RR, QQf, T):
 
     return KK
     
-KK_reg = lti_LQR(A_opt, B_opt, Qt_reg, Rt_reg, QT_reg, T)
+KK_reg = lti_LQR(A_opt, B_opt, Qt_reg, Rt_reg, QT_reg, TT)
 
-xx_temp = np.zeros((ns,T))
-uu_temp = np.zeros((ni,T))
+xx_temp = np.zeros((ns,TT))
+uu_temp = np.zeros((ni,TT))
 
 xx_temp[:,0] = np.array((0,0,0,1,0,0))      # initial conditions different from the ones of xx0_star 
 
-for tt in range(T-1):
+for tt in range(TT-1):
     uu_temp[:,tt] = uu_star[:,tt] + KK_reg[:,:,tt]@(xx_temp[:,tt]-xx_star[:,tt])
     xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
