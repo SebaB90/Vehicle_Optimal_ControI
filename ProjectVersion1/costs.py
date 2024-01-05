@@ -3,7 +3,7 @@
 # Cost functions
 # Bertamè Sebastiano
 # Bologna, 04/01/2024
-#
+#ppp
 
 import numpy as np
 
