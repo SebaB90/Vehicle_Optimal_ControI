@@ -177,8 +177,6 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = Non
 
     xx[:,tt+1] = xx_p
 
-    xxout = xx
-    uuout = uu
 
-  return KK, sigma, PP, xxout, uuout
+  return KK, sigma, PP, xx, uu
     

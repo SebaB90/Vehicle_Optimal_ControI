@@ -30,25 +30,198 @@ stepsize_0 = 1          # initial stepsize
 
 def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None, qqfin = None, ccin = None):
 
-    """
+
+  """
+	LQR for LTV system with (time-varying) affine cost
+	
+  Args
+    - AAin (nn x nn (x T)) matrix
+    - BBin (nn x mm (x T)) matrix
+    - QQin (nn x nn (x T)), RR (mm x mm (x T)), SS (mm x nn (x T)) stage cost
+    - QQfin (nn x nn) terminal cost
+    - qq (nn x (x T)) affine terms
+    - rr (mm x (x T)) affine terms
+    - qqf (nn x (x T)) affine terms - final cost
+    - T time horizon
+  Return
+    - KK (mm x nn x T) optimal gain sequence
+    - PP (nn x nn x T) riccati matrix
+  """
+	
+  try:
+    # check if matrix is (.. x .. x T) - 3 dimensional array 
+    ns, lA = AAin.shape[1:]
+  except:
+    # if not 3 dimensional array, make it (.. x .. x 1)
+    AAin = AAin[:,:,None]
+    ns, lA = AAin.shape[1:]
+
+  try:  
+    ni, lB = BBin.shape[1:]
+  except:
+    BBin = BBin[:,:,None]
+    ni, lB = BBin.shape[1:]
+
+  try:
+      nQ, lQ = QQin.shape[1:]
+  except:
+      QQin = QQin[:,:,None]
+      nQ, lQ = QQin.shape[1:]
+
+  try:
+      nR, lR = RRin.shape[1:]
+  except:
+      RRin = RRin[:,:,None]
+      nR, lR = RRin.shape[1:]
+
+  try:
+      nSi, nSs, lS = SSin.shape
+  except:
+      SSin = SSin[:,:,None]
+      nSi, nSs, lS = SSin.shape
+
+  # Check dimensions consistency -- safety
+  if nQ != ns:
+    print("Matrix Q does not match number of states")
+    exit()
+  if nR != ni:
+    print("Matrix R does not match number of inputs")
+    exit()
+  if nSs != ns:
+    print("Matrix S does not match number of states")
+    exit()
+  if nSi != ni:
+    print("Matrix S does not match number of inputs")
+    exit()
+
+
+  if lA < T:
+    AAin = AAin.repeat(T, axis=2)
+  if lB < T:
+    BBin = BBin.repeat(T, axis=2)
+  if lQ < T:
+    QQin = QQin.repeat(T, axis=2)
+  if lR < T:
+    RRin = RRin.repeat(T, axis=2)
+  if lS < T:
+    SSin = SSin.repeat(T, axis=2)
+
+  # Check for affine terms
+
+  augmented = False
+
+  if qqin is not None or rrin is not None or qqfin is not None:
+    augmented = True
+    print("Augmented term!")
+
+  KK = np.zeros((ni, ns, T))
+  sigma = np.zeros((ni, T))
+  PP = np.zeros((ns, ns, T))
+  pp = np.zeros((ns, T))
+
+  QQ = QQin
+  RR = RRin
+  SS = SSin
+  QQf = QQfin
+  
+  qq = qqin
+  rr = rrin
+
+  qqf = qqfin
+
+  AA = AAin
+  BB = BBin
+
+  xx = np.zeros((ns, T))
+  uu = np.zeros((ni, T))
+
+  xx[:,0] = x0
+  
+  PP[:,:,-1] = QQf
+  pp[:,-1] = qqf
+  
+  # Solve Riccati equation
+  for tt in reversed(range(T-1)):
+    QQt = QQ[:,:,tt]
+    qqt = qq[:,tt][:,None]
+    RRt = RR[:,:,tt]
+    rrt = rr[:,tt][:,None]
+    AAt = AA[:,:,tt]
+    BBt = BB[:,:,tt]
+    SSt = SS[:,:,tt]
+    PPtp = PP[:,:,tt+1]
+    pptp = pp[:, tt+1][:,None]
+
+    MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
+    mmt = rrt + BBt.T @ pptp
+    
+    PPt = AAt.T @ PPtp @ AAt - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ (BBt.T@PPtp@AAt + SSt) + QQt
+    ppt = AAt.T @ pptp - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ mmt + qqt
+
+    PP[:,:,tt] = PPt
+    pp[:,tt] = ppt.squeeze()
+
+
+  # Evaluate KK
+  
+  for tt in range(T-1):
+    QQt = QQ[:,:,tt]
+    qqt = qq[:,tt][:,None]
+    RRt = RR[:,:,tt]
+    rrt = rr[:,tt][:,None]
+    AAt = AA[:,:,tt]
+    BBt = BB[:,:,tt]
+    SSt = SS[:,:,tt]
+
+    PPtp = PP[:,:,tt+1]
+    pptp = pp[:,tt+1][:,None]
+
+    # Check positive definiteness
+
+    MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
+    mmt = rrt + BBt.T @ pptp
+
+    # for other purposes we could add a regularization step here...
+
+    KK[:,:,tt] = -MMt_inv@(BBt.T@PPtp@AAt + SSt)
+    sigma_t = -MMt_inv@mmt
+
+    sigma[:,tt] = sigma_t.squeeze()
+
+
+  
+
+  for tt in range(T - 1):
+    # Trajectory
+
+    uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
+    xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
+
+    xx[:,tt+1] = xx_p
+
+
+  return xx, uu
+
+
+"""
         LQR for LTV system with (time-varying) affine cost
         
     Args
-        - AAin (nn x nn (x TT)) matrix
-        - BBin (nn x mm (x TT)) matrix
-        - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
+        - AAin (nn x nn (x T)) matrix
+        - BBin (nn x mm (x T)) matrix
+        - QQin (nn x nn (x T)), RR (mm x mm (x T)), SS (mm x nn (x T)) stage cost
         - QQfin (nn x nn) terminal cost
-        - qq (nn x (x TT)) affine terms
-        - rr (mm x (x TT)) affine terms
-        - qqf (nn x (x TT)) affine terms - final cost
-        - TT time horizon
+        - qq (nn x (x T)) affine terms
+        - rr (mm x (x T)) affine terms
+        - qqf (nn x (x T)) affine terms - final cost
+        - T time horizon
     Return
-        - KK (mm x nn x TT) optimal gain sequence
-        - PP (nn x nn x TT) riccati matrix
-    """
+        - KK (mm x nn x T) optimal gain sequence
+        - PP (nn x nn x T) riccati matrix
+    
         
     try:
-        # check if matrix is (.. x .. x TT) - 3 dimensional array 
+        # check if matrix is (.. x .. x T) - 3 dimensional array 
         ns, lA = AAin.shape[1:]
     except:
         # if not 3 dimensional array, make it (.. x .. x 1)
@@ -169,7 +342,7 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None
 
         PP[:,:,tt] = PPt
         pp[:,tt] = ppt.squeeze()
-
+       
 
     for tt in range(T - 1):
         # Trajectory
@@ -178,10 +351,8 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None
 
         xx[:,tt+1] = xx_p
 
-        xxout = xx
-        uuout = uu
-
-    return xxout, uuout, sigma, KK
+    return xx, uu
+    """
 
 
 def cost(xx, uu, xx_ref, uu_ref, Q, R):
@@ -228,7 +399,7 @@ def Newton (xx_ref, uu_ref, max_iters):
     d11l = np.zeros((ns, ns, T))
     d22l = np.zeros((ni, ni, T))
     d12l = np.zeros((ni, ns, T))
-    cc = np.zeros((ns,T-1))
+    cc = np.zeros((ns,T))
 
     Qtilda = np.zeros((ns, ns, T))
     Rtilda = np.zeros((ni, ni, T))
@@ -275,7 +446,6 @@ def Newton (xx_ref, uu_ref, max_iters):
         temp_cost = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[0]
         J[kk] += temp_cost
 
-
         # Descent direction calculation
         lmbd_temp = cost_f(xx[:,T-1,kk], xx_ref[:,T-1], QT)[1]
         lmbd[:,T-1,kk] = lmbd_temp.squeeze()
@@ -285,24 +455,18 @@ def Newton (xx_ref, uu_ref, max_iters):
             d1l[:,tt], d2l[:,tt] = cost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Qt, Rt)[1:3]           
 
             lmbd_temp = A[:,:,tt].T@lmbd[:,tt+1,kk] + d1l[:,tt]       # costate equation
-            dJ_temp = B[:,:,tt].T@lmbd[:,tt+1,kk] + d2l[:,tt]         # gradient of J wrt u
-
+            dJ_temp = B[:,:,tt].T@lmbd[:,tt+1,kk] + d2l[:,tt]         # gradient of J wrt u 
             lmbd[:,tt,kk] = lmbd_temp.squeeze()
             dJ[:,tt,kk] = dJ_temp.squeeze()
-            
-            descent[kk] += deltau[:,tt,kk].T@deltau[:,tt,kk]
-            descent_arm[kk] += dJ[:,tt,kk].T@deltau[:,tt,kk]
 
-        print ('d1lllllllllllll', d1l,'d22222222222222222222222', d2l)
         # Matrices evaluation
         for tt in range(T):
             Qtilda[:,:,tt], Rtilda[:,:,tt], Stilda[:,:,tt] = cost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt], Qt, Rt)[3:]
-        
         d1lT, QTilda = cost_f(xx[:,-1,kk], xx_ref[:,-1], QT)[1:3]
 
-        Dx[:,:,kk], Du[:,:,kk], sigma, K = ltv_LQR(A, B, Qtilda, Rtilda, Stilda, QTilda, T, x0, d1l, d2l, d1lT, cc)
+        Dx[:,:,kk], Du[:,:,kk] = ltv_LQR(A, B, Qtilda, Rtilda, Stilda, QTilda, T, x0, d1l, d2l, d1lT, cc)
 
-        for tt in reversed(range(T-1)): 
+        for tt in range(T-1): 
             descent[kk] += Du[:,tt,kk].T@Du[:,tt,kk]
             descent_arm[kk] += dJ[:,tt,kk].T@Du[:,tt,kk]    
 
@@ -338,7 +502,7 @@ def Newton (xx_ref, uu_ref, max_iters):
             stepsizes.append(stepsize)                              # save the stepsize
             costs_armijo.append(np.min([JJ_temp, 100*J[kk]]))       # save the cost associated to the stepsize
 
-            if JJ_temp > J[kk]  + c*stepsize*descent_arm[kk]:
+            if JJ_temp > J[kk] + c*stepsize*descent_arm[kk]:
                 # update the stepsize
                 stepsize = beta*stepsize
             
@@ -377,7 +541,6 @@ def Newton (xx_ref, uu_ref, max_iters):
             JJ_temp += temp_cost
 
             costs[ii] = np.min([JJ_temp, 100*J[kk]])
-
 
         plt.figure(1)
         plt.clf()

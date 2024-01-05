@@ -143,7 +143,7 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
         # Armijo plot
 
-        steps = np.linspace(0,stepsize_0,int(3e1))
+        steps = np.linspace(0,stepsize_0,int(2e1))
         costs = np.zeros(len(steps))
 
         for ii in range(len(steps)):
@@ -173,7 +173,6 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
 
-        print('steps, descent_arm:', np.shape(steps),  np.shape(descent_arm))
 
         plt.figure(1)
         plt.clf()
