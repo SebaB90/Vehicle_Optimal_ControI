@@ -9,13 +9,8 @@ import numpy as np
 import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
-
-# ATTENTION! Import the dynamics that you want to simulate, COMMENT THE OTHER!
-#import vehicle_dynamics as dyn
-import pendulum_dynamics as dyn
-
-# import cost functions
-import costs as cst
+import Dynamics as dyn
+import Costs as cst
 
 #define params
 ns = dyn.ns  # number of states

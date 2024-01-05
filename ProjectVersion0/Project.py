@@ -17,7 +17,6 @@ from scipy.interpolate import PchipInterpolator
 from Newton import Newton
 
 
-
 # Allow Ctrl-C to work despite plotting
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -138,11 +137,11 @@ if Task0 :
 # Evaluate the EQUILIBRIUM  ----------------------------------------------------------------------------------
 
 eq = np.zeros((ns+ni, 2))
-initial_guess = [0.5, 0.1, 0]          # [x5(0), u0(0), u1(0)]
+initial_guess = [0.1, 0.1, 0]          # [x5(0), u0(0), u1(0)]
 
 # calculation of the parameters at equilibrium
 def equations(vars):
-    x5, u0, u1 = vars
+    x4, u0, u1 = vars
     Beta = [u0 - (x3*np.sin(x4) + a*x5)/(x3*np.cos(x4)), - (x3*np.sin(x4) - b*x5)/(x3*np.cos(x4))]              # Beta = [Beta_f, Beta_r]
     Fz = [m*g*b/(a+b), m*g*a/(a+b)]                                                                             # Fz = [F_zf, F_zr]
     Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                   # Fy = [F_yf, F_yr]
@@ -157,23 +156,25 @@ def equations(vars):
 
 # FIRST EQUILIBRIUM
 #imposing x3 and x4
-x3 = 4                  
-x4 = 0.1
+x3 = 3                  
+x5 = 0
 
 eq[3,0] = np.copy(x3)                           # V
-eq[4,0] = np.copy(x4)                           # beta
-eq[5:,0] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
-eq[2,0] = eq[5,0]*T_mid                               # psi   
+eq[5,0] = np.copy(x5)                           # psi dot
+eq[4,0] = fsolve(equations, initial_guess)[0]   # beta
+eq[6:,0] = fsolve(equations, initial_guess)[1:] # steering angle, force
+eq[2,0] = eq[5,0]*T_mid                         # psi   
 eq[0,0] = (eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*T_mid     # x
 eq[1,0] = (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
 
 # SECOND EQUILIBRIUM
-x3 = 6                 
-x4 = 0.25
+x3 = 5                 
+x5 = 0.2
 
 eq[3,1] = np.copy(x3)
-eq[4,1] = np.copy(x4)
-eq[5:,1] = fsolve(equations, initial_guess)
+eq[5,1] = np.copy(x5)                              
+eq[4,1] = fsolve(equations, initial_guess)[0]                           
+eq[6:,1] = fsolve(equations, initial_guess)[1:] 
 eq[2,1] = eq[2,0] + eq[5,1]*T_mid    
 eq[0,1] = eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*T_mid
 eq[1,1] = eq[1,0] + (eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*T_mid
@@ -260,37 +261,20 @@ uu = np.zeros((ni, T, max_iters))   # input seq.
 xx_ref = np.zeros((ns, T))          # state ref.
 uu_ref = np.zeros((ni, T))          # input ref.
 
-
 xx_ref = traj_ref[0:6,:]
 uu_ref = traj_ref[6:,:]
 
 
-'''
-####################################################################################
-# initial conditions
-for i in range(0,T):
-    xx[:,i,0] = xx_ref[:,0]
-    uu[:,i,0] = uu_ref[:,0]
-
-# Weight matrices
-Qt = np.diag([1, 1, 10, 1, 10, 10])
-QT = Qt
-Rt = np.diag([10, 1])
-S = np.zeros((ni,ns))
-xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
-#################################################################################
-'''
-'''
 # perform Newton's like method
-if 1:
-    xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
-    xx_star = xx[:,:,max_iters-1]
-    uu_star = uu[:,:,max_iters-1]
-    uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
+xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
-    # Plots
+xx_star = xx[:,:,max_iters-1]
+uu_star = uu[:,:,max_iters-1]
+uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
 
+# Plots
+if plot:
     plt.figure('descent direction')
     plt.plot(np.arange(max_iters), descent[:max_iters])
     plt.xlabel('$k$')
@@ -308,7 +292,7 @@ if 1:
     plt.show(block=False)
 
 # Design OPTIMAL TRAJECTORY  ---------------------------------------------------------------------------------------
-if 1:
+if plot:
     fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
     axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
@@ -362,9 +346,9 @@ if 1:
     plt.legend()
     plt.grid(True)
     plt.show()
-'''
+
 #########################################
-##### TASK 2: TRAJECTORY GENERATION II ##
+### TASK 2: TRAJECTORY GENERATION II ####
 #########################################
 
 # SMOOTHING the reference trajectory  -----------------------------------------------------------------------------------
@@ -423,27 +407,15 @@ axs[7].set_ylabel('$F$')
 plt.legend()
 plt.show()
 
-
 # NEWTON'S METHOD evaluation  ----------------------------------------------------------------------------------------
 # arrays to store data
 xx = np.zeros((ns, T, max_iters))   # state seq.
 uu = np.zeros((ni, T, max_iters))   # input seq.
 
-# initial conditions
-xx_init = np.zeros((ns, T))
-uu_init = np.zeros((ni, T))
-
-for i in range(0,T):
-    xx_init[:,i] = traj_smooth[0:6,0]
-    uu_init[:,i] = traj_smooth[6:,0]
-
 xx_ref = traj_smooth[0:6,:]
 uu_ref = traj_smooth[6:,:]
 
-xx[:,:,0] = xx_init
-uu[:,:,0] = uu_init
-
-xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, Qt, Rt, QT, max_iters)
+xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
 xx_star = xx[:,:,max_iters-1]
 uu_star = uu[:,:,max_iters-1]
@@ -522,3 +494,148 @@ plt.ylabel('Y-axis')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+#########################################
+##### TASK 3: TRAJECTORY VIA LQR ########
+#########################################
+
+A_opt = np.zeros((ns, ns, T))
+B_opt = np.zeros((ns, ni, T))
+Qt_reg = np.zeros((ns, ns, T))
+Rt_reg = np.zeros((ni, ni, T))
+
+for tt in range (T):
+    fx, fu = dyn.dynamics(xx_star[:,tt], uu_star[:,tt])[1:]
+
+    A_opt[:,:,tt] = fx.T
+    B_opt[:,:,tt] = fu.T
+
+    Qt_reg[:,:,tt] = 0.1*np.diag([1, 1, 100, 1, 100, 100])
+    Rt_reg[:,:,tt] = 0.01*np.diag([100, 1])
+
+QT_reg = Qt_reg[:,:,T]
+
+def lti_LQR(AA, BB, QQ, RR, QQf, T):
+
+    """
+        LQR for LTI system with fixed cost	
+        
+    Args
+        - AA (nn x nn) matrix
+        - BB (nn x mm) matrix
+        - QQ (nn x nn), RR (mm x mm) stage cost
+        - QQf (nn x nn) terminal cost
+        - TT time horizon
+    Return
+        - KK (mm x nn x TT) optimal gain sequence
+        - PP (nn x nn x TT) riccati matrix
+    """
+        
+    ns = AA.shape[1]
+    ni = BB.shape[1]
+
+    
+    PP = np.zeros((ns,ns,TT))
+    KK = np.zeros((ni,ns,TT))
+    
+    PP[:,:,-1] = QQf
+    
+    # Solve Riccati equation
+    for tt in reversed(range(TT-1)):
+        QQt = QQ
+        RRt = RR
+        AAt = AA
+        BBt = BB
+        PPtp = PP[:,:,tt+1]
+        
+        PP[:,:,tt] = QQt + AAt.T@PPtp@AAt - (AAt.T@PPtp@BBt)@np.linalg.inv((RRt + BBt.T@PPtp@BBt))@(BBt.T@PPtp@AAt)
+    
+    # Evaluate KK
+    
+    
+    for tt in range(TT-1):
+        QQt = QQ
+        RRt = RR
+        AAt = AA
+        BBt = BB
+        PPtp = PP[:,:,tt+1]
+        
+        KK[:,:,tt] = -np.linalg.inv(RRt + BBt.T@PPtp@BBt)@(BBt.T@PPtp@AAt)
+
+    return KK
+    
+KK_reg = lti_LQR(A_opt, B_opt, Qt_reg, Rt_reg, QT_reg, T)
+
+xx_temp = np.zeros((ns,T))
+uu_temp = np.zeros((ni,T))
+
+xx_temp[:,0] = np.array((0,0,0,1,0,0))      # initial conditions different from the ones of xx0_star 
+
+for tt in range(T-1):
+    uu_temp[:,tt] = uu_star[:,tt] + KK_reg[:,:,tt]@(xx_temp[:,tt]-xx_star[:,tt])
+    xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+
+uu_reg = uu_temp
+xx_reg = xx_temp
+
+
+# Design REGULARIZED TRAJECTORY  ---------------------------------------------------------------------------------------
+
+fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+
+axs[0].plot(tt_hor, xx_reg[0,:], linewidth=2)
+axs[0].plot(tt_hor, xx_star[0,:], 'g--', linewidth=2)
+axs[0].grid()
+axs[0].set_ylabel('$x$')
+
+axs[1].plot(tt_hor, xx_reg[1,:], linewidth=2)
+axs[1].plot(tt_hor, xx_star[1,:], 'g--', linewidth=2)
+axs[1].grid()
+axs[1].set_ylabel('$y$')
+
+axs[2].plot(tt_hor, xx_reg[2,:],'r', linewidth=2)
+axs[2].plot(tt_hor, xx_star[2,:], 'r--', linewidth=2)
+axs[2].grid()
+axs[2].set_ylabel('$psi$')
+
+axs[3].plot(tt_hor, xx_reg[3,:], linewidth=2)
+axs[3].plot(tt_hor, xx_star[3,:], 'g--', linewidth=2)
+axs[3].grid()
+axs[3].set_ylabel('$V$')
+
+axs[4].plot(tt_hor, xx_reg[4,:], linewidth=2)
+axs[4].plot(tt_hor, xx_star[4,:], 'g--', linewidth=2)
+axs[4].grid()
+axs[4].set_ylabel('$beta$')
+
+axs[5].plot(tt_hor, xx_reg[5,:],'r', linewidth=2)
+axs[5].plot(tt_hor, xx_star[5,:], 'r--', linewidth=2)
+axs[5].grid()
+axs[5].set_ylabel('$psi dot$')
+
+axs[6].plot(tt_hor, uu_reg[0,:], linewidth=2)
+axs[6].plot(tt_hor, uu_star[0,:], 'g--', linewidth=2)
+axs[6].grid()
+axs[6].set_ylabel('$delta$')
+
+axs[7].plot(tt_hor, uu_reg[1,:],'r', linewidth=2)
+axs[7].plot(tt_hor, uu_star[1,:], 'r--', linewidth=2)
+axs[7].grid()
+axs[7].set_ylabel('$F$')
+axs[7].set_xlabel('time')
+
+plt.show()
+
+# Plotting the trajectory
+plt.plot(xx_reg[0,:], xx_reg[1,:], label='Trajectory')
+plt.title('Vehicle Trajectory')
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+#########################################
+##### TASK 4: TRAJECTORY VIA LQR ########
+#########################################

@@ -5,26 +5,24 @@
 # Bologna, 04/01/2024
 #
 
-
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 from scipy.integrate import solve_ivp
 from scipy.interpolate import PchipInterpolator
-
-# ATTENTION! Import the dynamics that you want to simulate, COMMENT THE OTHER! Do that also for newtons and costs files
-#import vehicle_dynamics as dyn
-import pendulum_dynamics as dyn
-
-# import cost functions
-import costs as cst
-
-import newton as nwtn
+import Dynamics as dyn
+import Costs as cst
+import Newton as nwtn
 
 # Allow Ctrl-C to work despite plotting
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
+########################################################################
+###################### TASK 0: DISCRETIZATION #########################
+########################################################################
 
 
 ############################################################
@@ -295,15 +293,13 @@ if ns == 6:
     # Plot of the reference trajcetory
     tt_hor = np.linspace(0,tf,TT)
 
-    ####################################################################################################################################
-    ### Plot to test trajectory reference
+    # Plot to test trajectory reference
     plt.plot(traj_ref[0,:], traj_ref[1,:], label='Trajectory')
     plt.title('Vehicle Reference Trajectory')
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
     plt.grid(True)
     plt.show()
-    #######################################################################################################################################
 
     fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
@@ -384,18 +380,14 @@ if ns == 2:
   
     plt.show()
 
-
-
-############################################################
 # Initial guess
-############################################################
-
 xx_init = np.zeros((ns, TT))
 uu_init = np.zeros((ni, TT))
 
-
-# perform Newton's like method
-
+#####################################################################
+# NEWTON'S METHOD evaluation  
+#####################################################################
+    
 xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
 xx_star = xx[:,:,max_iters-1]
@@ -420,7 +412,9 @@ plt.yscale('log')
 plt.grid()
 plt.show(block=False)
 
-# Design OPTIMAL TRAJECTORY  ---------------------------------------------------------------------------------------
+##############################################################
+# Design OPTIMAL TRAJECTORY  
+##############################################################
 
 fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
@@ -496,72 +490,300 @@ plt.show()
 
 
 ########################################################################
-############## TASK 1: TRAJECTORY GENERATION (II) #######################
+############## TASK 2: TRAJECTORY GENERATION (II) ######################
 ########################################################################
 
 ############################################################
 # SMOOTHING the reference trajectory
 ############################################################
 
-if ns == 6:
+# Perform linear interpolation for reference trajectory
+fig, axs = plt.subplots(8, 1, sharex='all')
+fig.suptitle('Trajectory Smoothing using PCHIP Spline')
+traj_smooth = np.zeros((8,T))
+x_traj_smooth = np.zeros((8,T))
+
+axs[0].plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original Reference Trajectory')
+axs[0].grid()
+axs[1].plot(tt_hor, traj_ref[1, :], 'g--', linewidth=2, label='Original Reference Trajectory')
+axs[1].grid()
+axs[2].plot(tt_hor, traj_ref[2, :], 'g--', linewidth=2, label='Original Reference Trajectory')
+axs[2].grid()
+
+for i in range (3,ns+ni):
+    new_num_points = 7      # Adjust the number of points for a smoother curve
+    interp_indices = np.linspace(0, T - 1, new_num_points)
+    new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
+
+    # define point to create spline
+    x_spl = np.array([interp_indices[0], interp_indices[1], interp_indices[2], interp_indices[4], interp_indices[5], interp_indices[6]])
+    y_spl = np.array([new_traj_ref_0[0], new_traj_ref_0[1], new_traj_ref_0[2], new_traj_ref_0[4], new_traj_ref_0[5], new_traj_ref_0[6]])
+
+    # Create a piecewise cubic Hermite interpolating polynomial(PCHIP) interpolation of the given points
+    cs = PchipInterpolator(x_spl, y_spl)
+
+    # Generate new, smoother x values (denser for plotting)
+    x_spl_new = np.linspace(min(x_spl), max(x_spl), T)
+
+    # Compute the smoothed y values
+    y_spl_new = cs(x_spl_new)
+
+    # Store the values inside an array
+    traj_smooth[i,:] = y_spl_new
+
+    # Plotting the original and smoothed trajectories
+    axs[i].plot(tt_hor, traj_ref[i, :], 'g--', linewidth=2, label='Original Reference Trajectory')
+    axs[i].plot(interp_indices, new_traj_ref_0, 'b--', linewidth=2, label='Interpolated Trajectory')
+    axs[i].plot(x_spl, y_spl, 'o', label='Points used for spline creation')
+    axs[i].plot(x_spl_new, y_spl_new, 'r-', label='Smoothed Trajectory')
+    axs[i].grid()
+    if i == 8:
+        axs[i].xlabel('time')
+
+axs[0].set_ylabel('$x$')
+axs[1].set_ylabel('$y$')
+axs[2].set_ylabel('$psi$')
+axs[3].set_ylabel('$V$')
+axs[4].set_ylabel('$beta$')
+axs[5].set_ylabel('$psi dot$')
+axs[6].set_ylabel('$delta$')
+axs[7].set_ylabel('$F$')
+plt.legend()
+plt.show()
+
+#####################################################################
+# NEWTON'S METHOD evaluation  
+#####################################################################
+
+# arrays to store data
+xx = np.zeros((ns, T, max_iters))   # state seq.
+uu = np.zeros((ni, T, max_iters))   # input seq.
+
+xx_ref = traj_smooth[0:6,:]
+uu_ref = traj_smooth[6:,:]
+
+xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
+
+xx_star = xx[:,:,max_iters-1]
+uu_star = uu[:,:,max_iters-1]
+uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
+
+# Plots
+
+plt.figure('descent direction')
+plt.plot(np.arange(max_iters), descent[:max_iters])
+plt.xlabel('$k$')
+plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
+plt.yscale('log')
+plt.grid()
+plt.show(block=False)
+
+plt.figure('cost')
+plt.plot(np.arange(max_iters), JJ[:max_iters])
+plt.xlabel('$k$')
+plt.ylabel('$J(\\mathbf{u}^k)$')
+plt.yscale('log')
+plt.grid()
+plt.show(block=False)
+
+##############################################################
+# Design OPTIMAL TRAJECTORY  
+##############################################################
+
+fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+
+axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
+axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
+axs[0].grid()
+axs[0].set_ylabel('$x$')
+
+axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
+axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
+axs[1].grid()
+axs[1].set_ylabel('$y$')
+
+axs[2].plot(tt_hor, xx_star[2,:],'r', linewidth=2)
+axs[2].plot(tt_hor, xx_ref[2,:], 'r--', linewidth=2)
+axs[2].grid()
+axs[2].set_ylabel('$psi$')
+
+axs[3].plot(tt_hor, xx_star[3,:], linewidth=2)
+axs[3].plot(tt_hor, xx_ref[3,:], 'g--', linewidth=2)
+axs[3].grid()
+axs[3].set_ylabel('$V$')
+
+axs[4].plot(tt_hor, xx_star[4,:], linewidth=2)
+axs[4].plot(tt_hor, xx_ref[4,:], 'g--', linewidth=2)
+axs[4].grid()
+axs[4].set_ylabel('$beta$')
+
+axs[5].plot(tt_hor, xx_star[5,:],'r', linewidth=2)
+axs[5].plot(tt_hor, xx_ref[5,:], 'r--', linewidth=2)
+axs[5].grid()
+axs[5].set_ylabel('$psi dot$')
+
+axs[6].plot(tt_hor, uu_star[0,:], linewidth=2)
+axs[6].plot(tt_hor, uu_ref[0,:], 'g--', linewidth=2)
+axs[6].grid()
+axs[6].set_ylabel('$delta$')
+
+axs[7].plot(tt_hor, uu_star[1,:],'r', linewidth=2)
+axs[7].plot(tt_hor, uu_ref[1,:], 'r--', linewidth=2)
+axs[7].grid()
+axs[7].set_ylabel('$F$')
+axs[7].set_xlabel('time')
+
+plt.show()
+
+# Plotting the trajectory
+plt.plot(xx_star[0,:], xx_star[1,:], label='Trajectory')
+plt.title('Vehicle Trajectory')
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+#######################################################################
+##################### TASK 3: TRAJECTORY VIA LQR ######################
+#######################################################################
+
+A_opt = np.zeros((ns, ns, T))
+B_opt = np.zeros((ns, ni, T))
+Qt_reg = np.zeros((ns, ns, T))
+Rt_reg = np.zeros((ni, ni, T))
+
+for tt in range (T):
+    fx, fu = dyn.dynamics(xx_star[:,tt], uu_star[:,tt])[1:]
+
+    A_opt[:,:,tt] = fx.T
+    B_opt[:,:,tt] = fu.T
+
+    Qt_reg[:,:,tt] = 0.1*np.diag([1, 1, 100, 1, 100, 100])
+    Rt_reg[:,:,tt] = 0.01*np.diag([100, 1])
+
+QT_reg = Qt_reg[:,:,T]
+
     
-    tt_hor = range(TT)
+def lti_LQR(AA, BB, QQ, RR, QQf, T):
 
-    # Perform linear interpolation for reference trajectory
-    fig, axs = plt.subplots(ns+ni, 1, sharex='all')
-    fig.suptitle('Trajectory Smoothing using PCHIP Spline')
-    traj_smooth = np.zeros((ns+ni,TT))
-    x_traj_smooth = np.zeros((ns+ni,TT))
+    """
+        LQR for LTI system with fixed cost	
+        
+    Args
+        - AA (nn x nn) matrix
+        - BB (nn x mm) matrix
+        - QQ (nn x nn), RR (mm x mm) stage cost
+        - QQf (nn x nn) terminal cost
+        - TT time horizon
+    Return
+        - KK (mm x nn x TT) optimal gain sequence
+        - PP (nn x nn x TT) riccati matrix
+    """
+        
+    ns = AA.shape[1]
+    ni = BB.shape[1]
 
-    axs[0].plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-    axs[0].grid()
-    axs[1].plot(tt_hor, traj_ref[1, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-    axs[1].grid()
-    axs[2].plot(tt_hor, traj_ref[2, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-    axs[2].grid()
+    
+    PP = np.zeros((ns,ns,TT))
+    KK = np.zeros((ni,ns,TT))
+    
+    PP[:,:,-1] = QQf
+    
+    # Solve Riccati equation
+    for tt in reversed(range(TT-1)):
+        QQt = QQ
+        RRt = RR
+        AAt = AA
+        BBt = BB
+        PPtp = PP[:,:,tt+1]
+        
+        PP[:,:,tt] = QQt + AAt.T@PPtp@AAt - (AAt.T@PPtp@BBt)@np.linalg.inv((RRt + BBt.T@PPtp@BBt))@(BBt.T@PPtp@AAt)
+    
+    # Evaluate KK
+    
+    
+    for tt in range(TT-1):
+        QQt = QQ
+        RRt = RR
+        AAt = AA
+        BBt = BB
+        PPtp = PP[:,:,tt+1]
+        
+        KK[:,:,tt] = -np.linalg.inv(RRt + BBt.T@PPtp@BBt)@(BBt.T@PPtp@AAt)
 
-    for i in range (3,ns+ni):
-        new_num_points = 7      # Adjust the number of points for a smoother curve
-        interp_indices = np.linspace(0, TT - 1, new_num_points)
-        new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
+    return KK
+    
+KK_reg = lti_LQR(A_opt, B_opt, Qt_reg, Rt_reg, QT_reg, T)
 
-        # define point to create spline
-        x_spl = np.array([interp_indices[0], interp_indices[1], interp_indices[2], interp_indices[4], interp_indices[5], interp_indices[6]])
-        y_spl = np.array([new_traj_ref_0[0], new_traj_ref_0[1], new_traj_ref_0[2], new_traj_ref_0[4], new_traj_ref_0[5], new_traj_ref_0[6]])
+xx_temp = np.zeros((ns,T))
+uu_temp = np.zeros((ni,T))
 
-        # Create a piecewise cubic Hermite interpolating polynomial(PCHIP) interpolation of the given points
-        cs = PchipInterpolator(x_spl, y_spl)
+xx_temp[:,0] = np.array((0,0,0,1,0,0))      # initial conditions different from the ones of xx0_star 
 
-        # Generate new, smoother x values (denser for plotting)
-        x_spl_new = np.linspace(min(x_spl), max(x_spl), TT)
+for tt in range(T-1):
+    uu_temp[:,tt] = uu_star[:,tt] + KK_reg[:,:,tt]@(xx_temp[:,tt]-xx_star[:,tt])
+    xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
-        # Compute the smoothed y values
-        y_spl_new = cs(x_spl_new)
+uu_reg = uu_temp
+xx_reg = xx_temp
 
-        # Store the values inside an array
-        traj_smooth[i,:] = y_spl_new
+##############################################################
+# Design REGULARIZED TRAJECTORY  
+##############################################################
 
-        # Plotting the original and smoothed trajectories
-        axs[i].plot(tt_hor, traj_ref[i, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-        axs[i].plot(interp_indices, new_traj_ref_0, 'b--', linewidth=2, label='Interpolated Trajectory')
-        axs[i].plot(x_spl, y_spl, 'o', label='Points used for spline creation')
-        axs[i].plot(x_spl_new, y_spl_new, 'r-', label='Smoothed Trajectory')
-        axs[i].grid()
-        if i == ns+ni:
-            axs[i].xlabel('time')
+fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-    axs[0].set_ylabel('$x$')
-    axs[1].set_ylabel('$y$')
-    axs[2].set_ylabel('$psi$')
-    axs[3].set_ylabel('$V$')
-    axs[4].set_ylabel('$beta$')
-    axs[5].set_ylabel('$psi dot$')
-    axs[6].set_ylabel('$delta$')
-    axs[7].set_ylabel('$F$')
+axs[0].plot(tt_hor, xx_reg[0,:], linewidth=2)
+axs[0].plot(tt_hor, xx_star[0,:], 'g--', linewidth=2)
+axs[0].grid()
+axs[0].set_ylabel('$x$')
 
-    plt.legend()
-    plt.show()
+axs[1].plot(tt_hor, xx_reg[1,:], linewidth=2)
+axs[1].plot(tt_hor, xx_star[1,:], 'g--', linewidth=2)
+axs[1].grid()
+axs[1].set_ylabel('$y$')
 
+axs[2].plot(tt_hor, xx_reg[2,:],'r', linewidth=2)
+axs[2].plot(tt_hor, xx_star[2,:], 'r--', linewidth=2)
+axs[2].grid()
+axs[2].set_ylabel('$psi$')
 
+axs[3].plot(tt_hor, xx_reg[3,:], linewidth=2)
+axs[3].plot(tt_hor, xx_star[3,:], 'g--', linewidth=2)
+axs[3].grid()
+axs[3].set_ylabel('$V$')
+
+axs[4].plot(tt_hor, xx_reg[4,:], linewidth=2)
+axs[4].plot(tt_hor, xx_star[4,:], 'g--', linewidth=2)
+axs[4].grid()
+axs[4].set_ylabel('$beta$')
+
+axs[5].plot(tt_hor, xx_reg[5,:],'r', linewidth=2)
+axs[5].plot(tt_hor, xx_star[5,:], 'r--', linewidth=2)
+axs[5].grid()
+axs[5].set_ylabel('$psi dot$')
+
+axs[6].plot(tt_hor, uu_reg[0,:], linewidth=2)
+axs[6].plot(tt_hor, uu_star[0,:], 'g--', linewidth=2)
+axs[6].grid()
+axs[6].set_ylabel('$delta$')
+
+axs[7].plot(tt_hor, uu_reg[1,:],'r', linewidth=2)
+axs[7].plot(tt_hor, uu_star[1,:], 'r--', linewidth=2)
+axs[7].grid()
+axs[7].set_ylabel('$F$')
+axs[7].set_xlabel('time')
+
+plt.show()
+
+# Plotting the trajectory
+plt.plot(xx_reg[0,:], xx_reg[1,:], label='Trajectory')
+plt.title('Vehicle Trajectory')
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
+plt.legend()
+plt.grid(True)
+plt.show()
 
 

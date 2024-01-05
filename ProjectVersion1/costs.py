@@ -3,13 +3,10 @@
 # Cost functions
 # Bertamè Sebastiano
 # Bologna, 04/01/2024
-#ppp
+#
 
 import numpy as np
-
-# ATTENTION! Import the dynamics that you want to simulate, COMMENT THE OTHER!
-#import vehicle_dynamics as dyn
-import pendulum_dynamics as dyn
+import Dynamics as dyn
 
 # Import the number of states of the choosen dinamics
 ns = dyn.ns
