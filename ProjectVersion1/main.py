@@ -14,6 +14,7 @@ from scipy.interpolate import PchipInterpolator
 import Dynamics as dyn
 import Costs as cst
 import Newton as nwtn
+import Gradient as grad 
 
 # Allow Ctrl-C to work despite plotting
 import signal
@@ -49,13 +50,13 @@ test = True # Set true for testing the open loop dynamics and the correctness of
 # Trajectory parameters
 ############################################################
 
-tf = 10  # Final time in seconds
+tf = dyn.tf  # Final time in seconds
 
 dt = dyn.dt  # Get discretization step from dynamics
 ns = dyn.ns  # Get the number of states from the dynamics
 ni = dyn.ni  # Get the number of input from the dynamics
 
-TT = int(tf/dt)  # Number of discrete-time samples
+TT = dyn.TT  # Number of discrete-time samples
 TT_mid = TT/2
 
 
@@ -388,8 +389,21 @@ uu_init = np.zeros((ni, TT))
 # NEWTON'S METHOD evaluation  
 #####################################################################
     
-xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
+# xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
+####################################################################################à
+
+xx = np.zeros((ns, TT, max_iters))   # state seq.
+uu = np.zeros((ni, TT, max_iters))   # input seq.
+
+# initial conditions
+for i in range(0,TT):
+    xx[:,i,0] = xx_ref[:,0]
+    uu[:,i,0] = uu_ref[:,0]
+
+xx, uu, descent, JJ = grad.Gradient(xx, uu, xx_ref, uu_ref, cst.QQt, cst.RRt, cst.QQT, max_iters)
+
+#####################################################################################
 xx_star = xx[:,:,max_iters-1]
 uu_star = uu[:,:,max_iters-1]
 uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
@@ -645,7 +659,7 @@ plt.grid(True)
 plt.show()
 
 #######################################################################
-##################### TASK 3: TRAJECTORY VIA LQR ######################
+############### TASK 3: TRAJECTORY TRACKING VIA LQR ###################
 #######################################################################
 
 A_opt = np.zeros((ns, ns, TT))
@@ -664,7 +678,7 @@ for tt in range (TT):
 
 QT_reg = Qt_reg[:,:,TT]
 
-    
+
 def lti_LQR(AA, BB, QQ, RR, QQf, TT):
 
     """
@@ -684,7 +698,6 @@ def lti_LQR(AA, BB, QQ, RR, QQf, TT):
     ns = AA.shape[1]
     ni = BB.shape[1]
 
-    
     PP = np.zeros((ns,ns,TT))
     KK = np.zeros((ni,ns,TT))
     
@@ -701,8 +714,6 @@ def lti_LQR(AA, BB, QQ, RR, QQf, TT):
         PP[:,:,tt] = QQt + AAt.T@PPtp@AAt - (AAt.T@PPtp@BBt)@np.linalg.inv((RRt + BBt.T@PPtp@BBt))@(BBt.T@PPtp@AAt)
     
     # Evaluate KK
-    
-    
     for tt in range(TT-1):
         QQt = QQ
         RRt = RR
@@ -785,5 +796,20 @@ plt.ylabel('Y-axis')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+#######################################################################
+############## TASK 4: TRAJECTORY TRACKING VIA MPC ####################
+#######################################################################
+
+
+
+
+
+
+#######################################################################
+######################## TASK 5: ANIMATION ############################
+#######################################################################
+
 
 

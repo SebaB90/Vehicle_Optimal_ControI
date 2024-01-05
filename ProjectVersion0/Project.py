@@ -10,7 +10,7 @@ import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
 import Dynamics as dyn
-import Gradient as grad
+import ProjectVersion1.Gradient as grad
 import Newton as nwtn
 from scipy.optimize import fsolve
 from scipy.interpolate import PchipInterpolator

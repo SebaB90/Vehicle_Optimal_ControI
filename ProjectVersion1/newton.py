@@ -17,14 +17,9 @@ ns = dyn.ns  # number of states
 ni = dyn.ni  # number of inputs
 dt = dyn.dt  # sample time
 
-tf = 10  # Final time in seconds
-
-dt = dyn.dt  # Get discretization step from dynamics
-ns = dyn.ns  # Get the number of states from the dynamics
-ni = dyn.ni  # Get the number of input from the dynamics
-
-TT = int(tf/dt)  # Number of discrete-time samples
-TT_mid = TT/2
+TT = dyn.tf  # Final time in seconds
+T = dyn.TT  # Number of discrete-time samples
+TT_mid = dyn.TT_mid
 
 term_cond = 1e-6        #terminal condition
 
@@ -228,6 +223,8 @@ def Newton (xx_ref, uu_ref, max_iters):
         uu[:,i,0] = uu_ref[:,0]
 
     x0 = np.copy(xx_ref[:,0])
+
+    print(uu_ref)
     ################################################################################################################
     
     for kk in range(max_iters-1):

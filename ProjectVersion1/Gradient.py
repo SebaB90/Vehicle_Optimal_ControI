@@ -13,13 +13,13 @@ import Dynamics as dyn
 
 
 #define params
-ns = 6              #number of states
-ni = 2              #number of inputs
-dt = 1e-3           #sample time
+ns = dyn.ns  # number of states
+ni = dyn.ni  # number of inputs
+dt = dyn.dt  # sample time
 
-TT = dyn.TT             #discrete time samples
-T = dyn.TT               #time instants
-T_mid = dyn.T_mid       #half time
+TT = dyn.tf  # Final time in seconds
+T = dyn.TT  # Number of discrete-time samples
+TT_mid = dyn.TT_mid
 term_cond = 1e-6        #terminal condition
 
 # ARMIJO PARAMETERS
