@@ -1,12 +1,8 @@
 
 import numpy as np
-
-TT = 10
-d1l=np.zeros((10,1))
-d2l=[1,2,3,4,5,6,7,8,9,10]
-
-for tt in reversed(range(TT)):                        # integration backward in time
-
-    d1l[tt] = d2l[tt] 
-
-print (d1l[0])
+from scipy.optimize import fsolve
+def func(x):
+    return [x[0] * x[1] - 4,
+            x[1] * x[0] - x[1] - 5]
+root = fsolve(func, [-3, -6])
+print(root)
