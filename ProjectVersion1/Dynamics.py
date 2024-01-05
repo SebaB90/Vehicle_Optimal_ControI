@@ -6,7 +6,7 @@
 #
 
 import numpy as np
-vehicle_dyn = False          # change to switch between bicycle or pendulum dynamics
+vehicle_dyn = True          # change to switch between bicycle or pendulum dynamics
 
 dt = 1e-3  # discretization stepsize - Forward Euler
 tf = 10  # Final time in seconds

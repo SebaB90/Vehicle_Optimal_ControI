@@ -19,7 +19,7 @@ if ns == 2:
     QQT = QQt   # Terminal cost matrix
 
 if ns == 6:
-    QQt = 0.1*np.diag([1.0, 1.0, 100.0, 1.0, 100.0, 100.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
+    QQt = 0.1*np.diag([1.0, 1.0, 100.0, 1.0, 10000.0, 100.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
     RRt = 0.01*np.diag([100.0, 1.0])    # costs for uu = [Delta,F]
     QQT = QQt   # Terminal cost matrix
     

@@ -27,26 +27,6 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 ########################################################################
 
 ############################################################
-# Algorithm parameters
-############################################################
-
-max_iters = int(10)
-stepsize_0 = 1
-
-# ARMIJO PARAMETERS
-cc = 0.5
-beta = 0.7
-armijo_maxiters = 20  # number of Armijo iterations
-
-term_cond = 1e-6  # Termination condition
-
-visu_armijo = False  # Visualize Armijo iterations
-visu_animation = False  # Visualize trajectory animation
-
-test = True # Set true for testing the open loop dynamics and the correctness of the derivatives
-
-
-############################################################
 # Trajectory parameters
 ############################################################
 
@@ -57,30 +37,16 @@ ns = dyn.ns  # Get the number of states from the dynamics
 ni = dyn.ni  # Get the number of input from the dynamics
 
 TT = dyn.TT  # Number of discrete-time samples
-TT_mid = TT/2
+TT_mid = dyn.TT_mid
 
-
-############################################################
-# Arrays to store data
-############################################################
-
-xx = np.zeros((ns, TT, max_iters))  # state seq.
-uu = np.zeros((ni, TT, max_iters))  # input seq.
-
-lmbd = np.zeros((ns, TT, max_iters))  # lambdas - costate seq.
-
-deltau = np.zeros((ni,TT, max_iters))  # Du - descent direction
-dJ = np.zeros((ni,TT, max_iters))  # DJ - gradient of J wrt u
-
-JJ = np.zeros(max_iters)  # collect cost
-descent = np.zeros(max_iters)  # collect descent direction
-descent_arm = np.zeros(max_iters)  # collect descent direction
+max_iters = int(20)
+test = False # Set true for testing the open loop dynamics and the correctness of the derivatives
 
 ############################################################
 # TESTS
 ############################################################
 
-if test == False and ns==6:
+if test == True and ns==6:
     
     ######################################
     # OPEN LOOP TEST TO CHECK IF THE VEHICLE DYNAMICS IS CORRECT
@@ -228,7 +194,7 @@ if ns == 6:
 
     # Imposing x3 and x4 we evaluate the other parameters
     x3 = 3                 
-    x5 = 0
+    x5 = 0.1
     eq[3,0] = np.copy(x3)  # V
     eq[5,0] = np.copy(x5)  # psi 
     # Using fsolve we evaluate psi dot, steering angle, force
@@ -291,7 +257,7 @@ if ns == 6:
             traj_ref[3:, tt] = eq[3:,1]
 
     # Plot of the reference trajcetory
-    tt_hor = np.linspace(0,tf,TT)
+    tt_hor = range(TT)
 
     # Plot to test trajectory reference
     plt.plot(traj_ref[0,:], traj_ref[1,:], label='Trajectory')
@@ -361,7 +327,7 @@ if ns == 2:
     x0 = xx_ref[:, 0]
     
     # Plot of the reference trajcetory
-    tt_hor = np.linspace(0,tf,TT)
+    tt_hor = range(TT)
 
     fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
@@ -389,16 +355,16 @@ uu_init = np.zeros((ni, TT))
 #####################################################################
 
 
-xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
+xx, uu, descent, JJ, kk = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
-xx_star = xx[:,:,max_iters-1]
-uu_star = uu[:,:,max_iters-1]
-uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
+xx_star = xx[:,:,kk-1]
+uu_star = uu[:,:,kk-1]
+uu_star[:,-1] = uu_star[:,-3]        # for plotting purposes
 
 # Plots
 
 plt.figure('descent direction')
-plt.plot(np.arange(max_iters), descent[:max_iters])
+plt.plot(np.arange(kk), descent[:kk])
 plt.xlabel('$k$')
 plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
 plt.yscale('log')
@@ -406,7 +372,7 @@ plt.grid()
 plt.show(block=False)
 
 plt.figure('cost')
-plt.plot(np.arange(max_iters), JJ[:max_iters])
+plt.plot(np.arange(kk), JJ[:kk])
 plt.xlabel('$k$')
 plt.ylabel('$J(\\mathbf{u}^k)$')
 plt.yscale('log')
@@ -460,7 +426,7 @@ if ns == 6:
     axs[7].grid()
     axs[7].set_ylabel('$F$')
     axs[7].set_xlabel('time')
-    
+
 if ns == 2:
     axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
     axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
@@ -491,6 +457,7 @@ plt.show()
 
 if ns == 2:
     sys.exit()
+
 ########################################################################
 ############## TASK 2: TRAJECTORY GENERATION (II) ######################
 ########################################################################
@@ -565,16 +532,16 @@ uu = np.zeros((ni, TT, max_iters))   # input seq.
 xx_ref = traj_smooth[0:6,:]
 uu_ref = traj_smooth[6:,:]
 
-xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
+xx, uu, descent, JJ, kk = nwtn.Newton(xx_ref, uu_ref, max_iters)
 
-xx_star = xx[:,:,max_iters-1]
-uu_star = uu[:,:,max_iters-1]
+xx_star = xx[:,:,kk-1]
+uu_star = uu[:,:,kk-1]
 uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
 
 # Plots
 
 plt.figure('descent direction')
-plt.plot(np.arange(max_iters), descent[:max_iters])
+plt.plot(np.arange(kk), descent[:kk])
 plt.xlabel('$k$')
 plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
 plt.yscale('log')
@@ -582,7 +549,7 @@ plt.grid()
 plt.show(block=False)
 
 plt.figure('cost')
-plt.plot(np.arange(max_iters), JJ[:max_iters])
+plt.plot(np.arange(kk), JJ[:kk])
 plt.xlabel('$k$')
 plt.ylabel('$J(\\mathbf{u}^k)$')
 plt.yscale('log')

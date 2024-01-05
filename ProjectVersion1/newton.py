@@ -28,6 +28,7 @@ c = 0.5
 beta = 0.7
 armijo_maxiters = 20    # number of Armijo iterations
 stepsize_0 = 1          # initial stepsize
+armijo_plt = False
 
 # Import the cost matrices from costs
 Qt = cst.QQt
@@ -111,13 +112,6 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = Non
     if lS < TT:
         SSin = SSin.repeat(TT, axis=2)
 
-    # Check for affine terms
-
-    augmented = False
-
-    if qqin is not None or rrin is not None or qqfin is not None:
-        augmented = True
-        print("Augmented term!")
 
     KK = np.zeros((ni, ns, TT))
     sigma = np.zeros((ni, TT))
@@ -194,7 +188,6 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = Non
         sigma[:,tt] = sigma_t.squeeze()
 
 
-    
 
     for tt in range(TT - 1):
         # Trajectory
@@ -203,7 +196,6 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = Non
         xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
 
         xx[:,tt+1] = xx_p
-
 
     '''
 
@@ -479,49 +471,49 @@ def Newton (xx_ref, uu_ref, max_iters):
                 break
         
         # Armijo plot
+        if armijo_plt:
+            steps = np.linspace(0,stepsize_0,int(2e1))
+            costs = np.zeros(len(steps))
 
-        steps = np.linspace(0,stepsize_0,int(2e1))
-        costs = np.zeros(len(steps))
+            for ii in range(len(steps)):
 
-        for ii in range(len(steps)):
+                step = steps[ii]
 
-            step = steps[ii]
+                # temp solution update
 
-            # temp solution update
+                xx_temp = np.zeros((ns,TT))
+                uu_temp = np.zeros((ni,TT))
 
-            xx_temp = np.zeros((ns,TT))
-            uu_temp = np.zeros((ni,TT))
+                xx_temp[:,0] = x0
 
-            xx_temp[:,0] = x0
+                for tt in range(TT-1):
+                    uu_temp[:,tt] = uu[:,tt,kk] + step*Du[:,tt,kk]
+                    xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
-            for tt in range(TT-1):
-                uu_temp[:,tt] = uu[:,tt,kk] + step*Du[:,tt,kk]
-                xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+                # temp cost calculation
+                JJ_temp = 0
 
-            # temp cost calculation
-            JJ_temp = 0
+                for tt in range(TT-1):
+                    temp_cost = cst.stagecost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt])[0]
+                    JJ_temp += temp_cost
 
-            for tt in range(TT-1):
-                temp_cost = cst.stagecost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt])[0]
+                temp_cost = cst.termcost(xx_temp[:,-1], xx_ref[:,-1])[0]
                 JJ_temp += temp_cost
 
-            temp_cost = cst.termcost(xx_temp[:,-1], xx_ref[:,-1])[0]
-            JJ_temp += temp_cost
+                costs[ii] = np.min([JJ_temp, 100*J[kk]])
 
-            costs[ii] = np.min([JJ_temp, 100*J[kk]])
-
-        plt.figure(1)
-        plt.clf()
-        plt.plot(steps, costs, color='g', label='$\\ell(x^k - \\gamma*d^k$)')
-        plt.plot(steps, J[kk] + descent_arm[kk]*steps, color='r', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k$')
-      # plt.plot(steps, J[kk] + dJ[:,kk].T@Du[:,kk]*steps + 1/2*Du[:,kk].T@ddJ[:,:,kk]@Du[:,kk]*steps**2, color='b', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k - \\gamma^2 d^{k\\top}\\nabla^2\\ell(x^k) d^k$')
-        plt.plot(steps, J[kk] + c*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$\\ell(x^k) - \\gamma*c*\\nabla\\ell(x^k)^{\\top}d^k$')
-        plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
-        plt.grid()
-        plt.xlabel('stepsize')
-        plt.legend()
-        plt.draw()
-        plt.show()
+            plt.figure(1)
+            plt.clf()
+            plt.plot(steps, costs, color='g', label='$\\ell(x^k - \\gamma*d^k$)')
+            plt.plot(steps, J[kk] + descent_arm[kk]*steps, color='r', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k$')
+            # plt.plot(steps, J[kk] + dJ[:,kk].T@Du[:,kk]*steps + 1/2*Du[:,kk].T@ddJ[:,:,kk]@Du[:,kk]*steps**2, color='b', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k - \\gamma^2 d^{k\\top}\\nabla^2\\ell(x^k) d^k$')
+            plt.plot(steps, J[kk] + c*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$\\ell(x^k) - \\gamma*c*\\nabla\\ell(x^k)^{\\top}d^k$')
+            plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
+            plt.grid()
+            plt.xlabel('stepsize')
+            plt.legend()
+            plt.draw()
+            plt.show()
 
         # Update the current solution
 
@@ -542,9 +534,8 @@ def Newton (xx_ref, uu_ref, max_iters):
         print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,descent[kk], J[kk]))
 
         if descent[kk] <= term_cond:
-            max_iters = kk
             break
 
-    return xx, uu, descent, J
+    return xx, uu, descent, J, kk
 
 

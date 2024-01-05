@@ -10,7 +10,7 @@ import scipy as sp
 import matplotlib
 import matplotlib.pyplot as plt
 import Dynamics as dyn
-import ProjectVersion1.Gradient as grad
+# import Gradient as grad
 import Newton as nwtn
 from scipy.optimize import fsolve
 from scipy.interpolate import PchipInterpolator
@@ -266,15 +266,15 @@ uu_ref = traj_ref[6:,:]
 
 
 # perform Newton's like method
-
-xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
-
-xx_star = xx[:,:,max_iters-1]
-uu_star = uu[:,:,max_iters-1]
-uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
-
-# Plots
 if plot:
+    xx, uu, descent, JJ = nwtn.Newton(xx_ref, uu_ref, max_iters)
+
+    xx_star = xx[:,:,max_iters-1]
+    uu_star = uu[:,:,max_iters-1]
+    uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
+
+    # Plots
+
     plt.figure('descent direction')
     plt.plot(np.arange(max_iters), descent[:max_iters])
     plt.xlabel('$k$')
