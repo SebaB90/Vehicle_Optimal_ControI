@@ -39,7 +39,7 @@ ni = dyn.ni  # Get the number of input from the dynamics
 TT = dyn.TT  # Number of discrete-time samples
 TT_mid = dyn.TT_mid
 
-max_iters = int(20)
+max_iters = 10
 test = False # Set true for testing the open loop dynamics and the correctness of the derivatives
 
 ############################################################
@@ -196,8 +196,8 @@ if ns == 6:
     x3 = 3                 
     x5 = 0.1
     eq[3,0] = np.copy(x3)  # V
-    eq[5,0] = np.copy(x5)  # psi 
-    # Using fsolve we evaluate psi dot, steering angle, force
+    eq[5,0] = np.copy(x5)  # psi dot 
+    # Using fsolve we evaluate beta, steering angle, force
     eq[4,0] = fsolve(equations, initial_guess)[0]  # beta
     eq[6:,0] = fsolve(equations, initial_guess)[1:]  # steering angle, force
     # We evaluate x, y and psi by integration
@@ -211,8 +211,8 @@ if ns == 6:
     x3 = 5                 
     x5 = 0.2
     eq[3,1] = np.copy(x3)  # V
-    eq[5,1] = np.copy(x5)  # psi 
-    # Using fsolve we evaluate psi dot, steering angle, force
+    eq[5,1] = np.copy(x5)  # psi dot
+    # Using fsolve we evaluate beta, steering angle, force
     eq[4,1] = fsolve(equations, initial_guess)[0]  # beta
     eq[6:,1] = fsolve(equations, initial_guess)[1:]  # steering angle, force
     # We evaluate x, y and psi by integration
@@ -239,9 +239,6 @@ if ns == 6:
 
     traj_ref = np.zeros((ns+ni, TT))
     traj_ref[3:,0] = eq[3:,0]
-    
-    xx_ref = traj_ref[0:6,:]
-    uu_ref = traj_ref[6:,:]
 
     # Step reference signal - for all the states
 
@@ -255,6 +252,9 @@ if ns == 6:
 
         else:  
             traj_ref[3:, tt] = eq[3:,1]
+
+    xx_ref = traj_ref[0:6,:]
+    uu_ref = traj_ref[6:,:]
 
     # Plot of the reference trajcetory
     tt_hor = range(TT)
@@ -447,7 +447,8 @@ if ns == 2:
 plt.show()
 
 # Plotting the trajectory
-plt.plot(xx_star[0,:], xx_star[1,:], label='Trajectory')
+plt.plot(xx_star[0,:], xx_star[1,:], label='Optimal Trajectory')
+plt.plot(xx_ref[0,:], xx_ref[1,:],'r--', label='Reference Trajectory')
 plt.title('Vehicle Trajectory')
 plt.xlabel('X-axis')
 plt.ylabel('Y-axis')
@@ -456,6 +457,10 @@ plt.grid(True)
 plt.show()
 
 if ns == 2:
+    print("\n\n")
+    purple_bold_title = "\033[1;35mPENDULUM EVALUATION TERMINATED:\033[0m"
+    print(purple_bold_title) 
+    print("\n\n")
     sys.exit()
 
 ########################################################################
@@ -606,7 +611,8 @@ axs[7].set_xlabel('time')
 plt.show()
 
 # Plotting the trajectory
-plt.plot(xx_star[0,:], xx_star[1,:], label='Trajectory')
+plt.plot(xx_star[0,:], xx_star[1,:], label='Optimal Trajectory')
+plt.plot(xx_ref[0,:], xx_ref[1,:],'b--', label='Reference Trajectory')
 plt.title('Vehicle Trajectory')
 plt.xlabel('X-axis')
 plt.ylabel('Y-axis')
@@ -745,7 +751,8 @@ axs[7].set_xlabel('time')
 plt.show()
 
 # Plotting the trajectory
-plt.plot(xx_reg[0,:], xx_reg[1,:], label='Trajectory')
+plt.plot(xx_star[0,:], xx_star[1,:], label='Regularized Trajectory')
+plt.plot(xx_ref[0,:], xx_ref[1,:],'b--', label='Optimal Trajectory')
 plt.title('Vehicle Trajectory')
 plt.xlabel('X-axis')
 plt.ylabel('Y-axis')
