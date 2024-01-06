@@ -8,9 +8,12 @@
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.ticker import (AutoMinorLocator, MultipleLocator) 
 from scipy.optimize import fsolve
 from scipy.integrate import solve_ivp
 from scipy.interpolate import PchipInterpolator
+import cvxpy as cp
 import sys
 import Dynamics as dyn
 import Costs as cst
@@ -21,6 +24,8 @@ import Gradient as grad
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+test = False # Set true for testing the open loop dynamics and the correctness of the derivatives
+visu_animation = True
 
 ########################################################################
 ###################### TASK 0: DISCRETIZATION #########################
@@ -39,8 +44,7 @@ ni = dyn.ni  # Get the number of input from the dynamics
 TT = dyn.TT  # Number of discrete-time samples
 TT_mid = dyn.TT_mid
 
-max_iters = 10
-test = False # Set true for testing the open loop dynamics and the correctness of the derivatives
+max_iters = 5
 
 ############################################################
 # TESTS
@@ -378,6 +382,74 @@ plt.ylabel('$J(\\mathbf{u}^k)$')
 plt.yscale('log')
 plt.grid()
 plt.show(block=False)
+
+#########################################################################
+time = np.arange(len(tt_hor))*dt
+
+if visu_animation:
+    
+  fig = plt.figure()
+  ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1, 1), ylim=(-.5, 1.2))
+  ax.grid()
+  # no labels
+  ax.set_yticklabels([])
+  ax.set_xticklabels([])
+
+  
+  line0, = ax.plot([], [], 'o-', lw=2, c='b', label='Optimal')
+  line1, = ax.plot([], [], '*-', lw=2, c='g',dashes=[2, 2], label='Reference')
+
+  time_template = 't = %.1f s'
+  time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
+  fig.gca().set_aspect('equal', adjustable='box')
+
+  # Subplot
+  left, bottom, width, height = [0.64, 0.13, 0.2, 0.2]
+  ax2 = fig.add_axes([left, bottom, width, height])
+  ax2.xaxis.set_major_locator(MultipleLocator(2))
+  ax2.yaxis.set_major_locator(MultipleLocator(0.25))
+  ax2.set_xticklabels([])
+  
+
+  ax2.grid(which='both')
+  ax2.plot(time, xx_star[0],c='b')
+  ax2.plot(time, xx_ref[0], color='g', dashes=[2, 1])
+
+  point1, = ax2.plot([], [], 'o', lw=2, c='b')
+
+
+  def init():
+      line0.set_data([], [])
+      line1.set_data([], [])
+
+      point1.set_data([], [])
+
+      time_text.set_text('')
+      return line0,line1, time_text, point1
+
+
+  def animate(i):
+      # Trajectory
+      thisx0 = [0, xx_star[0, i]]
+      thisy0 = [0, xx_star[1, i]]
+      line0.set_data(thisx0, thisy0)
+
+      # Reference
+      thisx1 = [0, xx_ref[0, :]]
+      thisy1 = [0, xx_ref[1, :]]
+      line1.set_data(thisx1, thisy1)
+
+      point1.set_data(i*dt, xx_star[0, i])
+
+      time_text.set_text(time_template % (i*dt))
+      return line0, line1, time_text, point1
+
+
+  ani = animation.FuncAnimation(fig, animate, TT, interval=1, blit=True, init_func=init)
+  ax.legend(loc="lower left")
+
+  
+  plt.show()
 
 ##############################################################
 # Design OPTIMAL TRAJECTORY  
@@ -764,15 +836,305 @@ plt.show()
 #######################################################################
 ############## TASK 4: TRAJECTORY TRACKING VIA MPC ####################
 #######################################################################
+Tsim = TT
+
+def linear_mpc(AA, BB, QQ, RR, QQf, xxt, umax, umin, x1_max, x1_min, x2_max, x2_min, T_pred):
+    """
+        Linear MPC solver - Constrained LQR
+
+        Given a measured state xxt measured at t
+        gives back the optimal input to be applied at t
+
+        Args
+          - AA, BB: linear dynamics
+          - QQ,RR,QQf: cost matrices
+          - xxt: initial condition (at time t)
+          - T: time (prediction) horizon
+
+        Returns
+          - u_t: input to be applied at t
+          - xx, uu predicted trajectory
+
+    """
+
+    xxt = xxt.squeeze()
+
+    xx_mpc = cp.Variable((ns, T_pred))
+    uu_mpc = cp.Variable((ni, T_pred))
+
+    cost = 0
+    constr = []
+
+    for tt in range(T_pred-1):
+        cost += cp.quad_form(xx_mpc[:,tt], QQ) + cp.quad_form(uu_mpc[:,tt], RR)
+        constr += [xx_mpc[:,tt+1] == AA@xx_mpc[:,tt] + BB@uu_mpc[:,tt], # dynamics constraint
+                uu_mpc[:,tt] <= umax, # other constraints
+                uu_mpc[:,tt] >= umin,
+                xx_mpc[0,tt] <= x1_max,
+                xx_mpc[0,tt] >= x1_min,
+                xx_mpc[1,tt] <= x2_max,
+                xx_mpc[1,tt] >= x2_min]
+    # sums problem objectives and concatenates constraints.
+    cost += cp.quad_form(xx_mpc[:,T_pred-1], QQf)
+    constr += [xx_mpc[:,0] == xxt]
+
+    problem = cp.Problem(cp.Minimize(cost), constr)
+    problem.solve()
+
+    if problem.status == "infeasible":
+    # Otherwise, problem.value is inf or -inf, respectively.
+        print("Infeasible problem! CHECK YOUR CONSTRAINTS!!!")
+
+    return uu_mpc[:,0].value, xx_mpc.value, uu_mpc.value
+
+#############################
+# Model Predictive Control
+#############################
+
+T_pred = 20       # MPC Prediction horizon
+umax = 100
+umin = -umax
+
+x2max = 2
+x2min = -x2max
+
+xx_real_mpc = np.zeros((ns,Tsim))
+uu_real_mpc = np.zeros((ni,Tsim))
+
+xx_mpc = np.zeros((ns, T_pred, Tsim))
+
+xx_real_mpc[:,0] = xx_star[:,0]
+
+for tt in range(Tsim-1):
+    # System evolution - real with MPC
+
+    xx_t_mpc = xx_real_mpc[:,tt] # get initial condition
+
+    # Solve MPC problem - apply first input
+
+    if tt%5 == 0: # print every 5 time instants
+      print('MPC:\t t = {}'.format(tt))
+
+    uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, cst.QQt, cst.RRt, cst.QQT, xx_t_mpc, umax=umax, umin=umin, x2_min = x2min, x2_max = x2max, T_pred = T_pred)[:2]
+    
+    xx_real_mpc[:,tt+1] = dyn.dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
 
 
 
+#######################################
+# Plots
+#######################################
 
+time = np.arange(Tsim)
+
+fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+
+axs[0].plot(time, xx_real_mpc[0,:], linewidth=2)
+axs[0].plot(time, xx_star[0,:],'--r', linewidth=2)
+axs[0].grid()
+axs[0].set_ylabel('$x_1$')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[0].set_ylim([-10,10])
+
+axs[0].set_xlim([-1,Tsim])
+axs[0].legend(['MPC', 'OPT'])
+
+#####
+axs[1].plot(time, xx_real_mpc[1,:], linewidth=2)
+axs[1].plot(time, xx_star[1,:], '--r', linewidth=2)
+
+if x2max < 1.1*np.amax(xx_real_mpc[1,:]): # draw constraints only if active
+  axs[1].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
+  axs[1].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
+
+axs[1].grid()
+axs[1].set_ylabel('$x_2$')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[1].set_ylim([-10,10])
+
+axs[1].set_xlim([-1,Tsim])
+axs[1].legend(['MPC', 'OPT'])
+
+#####
+axs[2].plot(time, xx_real_mpc[2,:], linewidth=2)
+axs[2].plot(time, xx_star[2,:], '--r', linewidth=2)
+
+if x2max < 1.1*np.amax(xx_real_mpc[2,:]): # draw constraints only if active
+  axs[2].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
+  axs[2].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
+
+axs[2].grid()
+axs[2].set_ylabel('$x_2$')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[2].set_ylim([-10,10])
+
+axs[2].set_xlim([-1,Tsim])
+axs[2].legend(['MPC', 'OPT'])
+
+#####
+axs[3].plot(time, xx_real_mpc[3,:], linewidth=2)
+axs[3].plot(time, xx_star[3,:], '--r', linewidth=2)
+
+if x2max < 1.1*np.amax(xx_real_mpc[3,:]): # draw constraints only if active
+  axs[3].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
+  axs[3].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
+
+axs[3].grid()
+axs[3].set_ylabel('$x_2$')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[3].set_ylim([-10,10])
+
+axs[3].set_xlim([-1,Tsim])
+axs[3].legend(['MPC', 'OPT'])
+
+#####
+axs[4].plot(time, xx_real_mpc[4,:], linewidth=2)
+axs[4].plot(time, xx_star[4,:], '--r', linewidth=2)
+
+if x2max < 1.1*np.amax(xx_real_mpc[4,:]): # draw constraints only if active
+  axs[4].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
+  axs[4].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
+
+axs[4].grid()
+axs[4].set_ylabel('$x_2$')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[4].set_ylim([-10,10])
+
+axs[4].set_xlim([-1,Tsim])
+axs[4].legend(['MPC', 'OPT'])
+
+#####
+axs[5].plot(time, xx_real_mpc[5,:], linewidth=2)
+axs[5].plot(time, xx_star[5,:], '--r', linewidth=2)
+
+if x2max < 1.1*np.amax(xx_real_mpc[5,:]): # draw constraints only if active
+  axs[5].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
+  axs[5].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
+
+axs[5].grid()
+axs[5].set_ylabel('$x_2$')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[5].set_ylim([-10,10])
+
+axs[5].set_xlim([-1,Tsim])
+axs[5].legend(['MPC', 'OPT'])
+
+#####
+axs[6].plot(time, uu_real_mpc[0,:],'g', linewidth=2)
+axs[6].plot(time, uu_star[0,:],'--r', linewidth=2)
+
+if umax < 1.1*np.amax(uu_real_mpc[0,:]): # draw constraints only if active
+  axs[6].plot(time, np.ones(Tsim)*umax, '--g', linewidth=1)
+  axs[6].plot(time, np.ones(Tsim)*umin, '--g', linewidth=1)
+
+axs[6].grid()
+axs[6].set_ylabel('$u$')
+axs[6].set_xlabel('time')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[6].set_ylim([-10,10])
+
+axs[6].set_xlim([-1,Tsim])
+axs[6].legend(['MPC', 'LQR'])
+
+#####
+axs[7].plot(time, uu_real_mpc[1,:],'g', linewidth=2)
+axs[7].plot(time, uu_star[1,:],'--r', linewidth=2)
+
+if umax < 1.1*np.amax(uu_real_mpc[1,:]): # draw constraints only if active
+  axs[7].plot(time, np.ones(Tsim)*umax, '--g', linewidth=1)
+  axs[7].plot(time, np.ones(Tsim)*umin, '--g', linewidth=1)
+
+axs[7].grid()
+axs[7].set_ylabel('$u$')
+axs[7].set_xlabel('time')
+
+if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
+  axs[7].set_ylim([-10,10])
+
+axs[7].set_xlim([-1,Tsim])
+axs[7].legend(['MPC', 'LQR'])
+
+
+fig.align_ylabels(axs)
+
+plt.show()
 
 
 #######################################################################
 ######################## TASK 5: ANIMATION ############################
 #######################################################################
 
+time = np.arange(len(tt_hor))*dt
 
+if visu_animation:
+    
+  fig = plt.figure()
+  ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1, 1), ylim=(-.5, 1.2))
+  ax.grid()
+  # no labels
+  ax.set_yticklabels([])
+  ax.set_xticklabels([])
+
+  
+  line0, = ax.plot([], [], 'o-', lw=2, c='b', label='Optimal')
+  line1, = ax.plot([], [], '*-', lw=2, c='g',dashes=[2, 2], label='Reference')
+
+  time_template = 't = %.1f s'
+  time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
+  fig.gca().set_aspect('equal', adjustable='box')
+
+  # Subplot
+  left, bottom, width, height = [0.64, 0.13, 0.2, 0.2]
+  ax2 = fig.add_axes([left, bottom, width, height])
+  ax2.xaxis.set_major_locator(MultipleLocator(2))
+  ax2.yaxis.set_major_locator(MultipleLocator(0.25))
+  ax2.set_xticklabels([])
+  
+
+  ax2.grid(which='both')
+  ax2.plot(time, xx_reg[0],c='b')
+  ax2.plot(time, xx_ref[0], color='g', dashes=[2, 1])
+
+  point1, = ax2.plot([], [], 'o', lw=2, c='b')
+
+
+  def init():
+      line0.set_data([], [])
+      line1.set_data([], [])
+
+      point1.set_data([], [])
+
+      time_text.set_text('')
+      return line0,line1, time_text, point1
+
+
+  def animate(i):
+      # Trajectory
+      thisx0 = [0, xx_reg[0, i]]
+      thisy0 = [0, xx_reg[1, i]]
+      line0.set_data(thisx0, thisy0)
+
+      # Reference
+      thisx1 = [0, xx_ref[0, :]]
+      thisy1 = [0, xx_ref[1, :]]
+      line1.set_data(thisx1, thisy1)
+
+      point1.set_data(i*dt, xx_reg[0, i])
+
+      time_text.set_text(time_template % (i*dt))
+      return line0, line1, time_text, point1
+
+
+  ani = animation.FuncAnimation(fig, animate, TT, interval=1, blit=True, init_func=init)
+  ax.legend(loc="lower left")
+
+  
+  plt.show()
 
