@@ -175,7 +175,6 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
 
             costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
 
-        print('\nJJ(k)\n',JJ[kk],'\ndescent arm\n',descent_arm[kk],'\ndJ\n',dJ[:,:,kk],'\ndeltau\n',deltau[:,:,kk])
         plt.figure(1)
         plt.clf()
         plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')
@@ -207,7 +206,6 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         print('Iter = {}\t Descent = {:.3e}\t Cost = {:.3e}'.format(kk,descent[kk], JJ[kk]))
 
         if descent[kk] <= term_cond:
-            max_iters = kk
             break
 
-    return xx, uu, descent, JJ
+    return xx, uu, descent, JJ, kk

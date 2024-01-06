@@ -19,7 +19,7 @@ if ns == 2:
     QQT = QQt   # Terminal cost matrix
 
 if ns == 6:
-    QQt = 0.1*np.diag([1.0, 1.0, 10.0, 1.0, 10.0, 10.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
+    QQt = np.diag([1.0, 1.0, 100.0, 10000.0, 100.0, 10.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
     RRt = np.diag([10.0, 1.0])    # costs for uu = [Delta,F]
     QQT = QQt   # Terminal cost matrix
     
@@ -59,7 +59,7 @@ def stagecost(xx, uu, xx_ref, uu_ref):
     luu = RRt
     lux = np.zeros((ni, ns))
 
-    return ll.squeeze(), lx.squeeze(), lu.squeeze(), lxx.squeeze(), luu.squeeze(), lux.squeeze()
+    return ll.squeeze(), lx, lu, lxx, luu, lux
 
 
 #######################################
@@ -88,4 +88,4 @@ def termcost(xx, xx_ref):
     lTx = QQT @ (xx - xx_ref)
     lTxx = QQT
 
-    return llT.squeeze(), lTx.squeeze(), lTxx.squeeze()
+    return llT.squeeze(), lTx, lTxx

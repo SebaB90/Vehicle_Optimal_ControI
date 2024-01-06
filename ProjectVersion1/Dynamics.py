@@ -1,12 +1,12 @@
 #
-# Optimal Control of a vehicle
-# Discrete-time nonlinear dynamics of a vehicle
+# Optimal Control of aa vehicle
+# Discrete-time nonlinear dynamics of aa vehicle
 # Bertamè Sebastiano
 # Bologna, 04/01/2024
 #
 
 import numpy as np
-vehicle_dyn = True          # change to switch between bicycle or pendulum dynamics
+vehicle_dyn = False          # change to switch between bicycle or pendulum dynamics
 
 dt = 1e-3  # discretization stepsize - Forward Euler
 tf = 10  # Final time in seconds
@@ -20,11 +20,11 @@ if vehicle_dyn:
 
     # Vehicle parameters
     mm = 1480  # Kg
-    Iz = 1950  # Kg*m^2
-    aa = 1.421  # m           
-    bb = 1.029  # m
+    Iz = 1950  # Kg*mm^2
+    aa = 1.421  # mm           
+    bb = 1.029  # mm
     mi = 1  # nodim
-    gg = 9.81  # m/s^2
+    gg = 9.81  # mm/s^2
 
 else:
     # Constants for the dynamics
@@ -50,7 +50,7 @@ def dynamics(xx, uu):
 
     if vehicle_dyn:
         """
-        Nonlinear dynamics of a vehicle
+        Nonlinear dynamics of aa vehicle
 
         Args:
             xx (numpy.ndarray): State at time t, R^6.
@@ -62,64 +62,95 @@ def dynamics(xx, uu):
             numpy.ndarray: Gradient of f wrt uu, at xx,uu.
         """
 
-        # Add a dimension for improving the compatibility of the code
-        # xx = xx[:, None]
-        # uu = uu[:, None]     
+        # Add aa dimension for improving the compatibility of the code
+        xx = xx[:, None]
+        uu = uu[:, None]     
         
         # Preallocate the next state vector
         xxp = np.zeros((ns,1))
         
         # Pre-compute repeated terms for efficiency
-        cos_xx4 = np.cos(xx[4])
-        sin_xx4 = np.sin(xx[4])
-        cos_xx4_minus_uu0 = np.cos(xx[4] - uu[0])
-        sin_xx4_minus_uu0 = np.sin(xx[4] - uu[0])
-        m_xx3_sq = mm * (xx[3]**2)
+        cos_xx4 = np.cos(xx[4,0])
+        sin_xx4 = np.sin(xx[4,0])
+        cos_xx2 = np.cos(xx[2,0])
+        sin_xx2 = np.sin(xx[2,0])
+        cos_xx4_minus_uu0 = np.cos(xx[4,0] - uu[0,0])
+        sin_xx4_minus_uu0 = np.sin(xx[4,0] - uu[0,0])
+        m_xx3_sq = mm * (xx[3,0]**2)
 
         # Compute slip angles for front and rear (Beta_f, Beta_r)
         Beta = ([
-            uu[0] - (xx[3]*sin_xx4 + aa*xx[5]) / (xx[3]*cos_xx4), 
-            - (xx[3]*sin_xx4 - bb*xx[5]) / (xx[3]*cos_xx4)
+            uu[0,0] - (xx[3,0]*sin_xx4 + aa*xx[5,0]) / (xx[3,0]*cos_xx4), 
+            - (xx[3,0]*sin_xx4 - bb*xx[5,0]) / (xx[3,0]*cos_xx4)
+        ])
+
+        dBetax3 = ([
+            -(sin_xx4*xx[3,0]*cos_xx4 - cos_xx4*(xx[3,0]*sin_xx4+aa*xx[5,0]))/((xx[3,0]*cos_xx4)**2),
+            -(sin_xx4*xx[3,0]*cos_xx4 - cos_xx4*(xx[3,0]*sin_xx4-bb*xx[5,0]))/((xx[3,0]*cos_xx4)**2)
+        ])
+        
+        dBetax4 = ([
+            -(xx[3,0]*cos_xx4*xx[3,0]*cos_xx4 + xx[3,0]*sin_xx4*(xx[3,0]*sin_xx4+aa*xx[5,0]))/((xx[3,0]*cos_xx4)**2),
+            -(xx[3,0]*cos_xx4*xx[3,0]*cos_xx4 + xx[3,0]*sin_xx4*(xx[3,0]*sin_xx4-bb*xx[5,0]))/((xx[3,0]*cos_xx4)**2)
+        ])
+
+        dBetax5 = ([
+            -aa/(xx[3,0]*cos_xx4),
+            bb/(xx[3,0]*cos_xx4)
+        ])
+
+        dBetau0 = ([
+            1,
+            0
         ])
         
         # Compute vertical forces at front and rear (F_zf, F_zr)
         Fz = ([mm*gg*bb/(aa+bb), mm*gg*aa/(aa+bb)])
-        
+
         # Compute lateral forces at front and rear (F_yf, F_yr)
         Fy = ([mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]])
 
-        # Discrete-time nonlinear dynamics calculations for next state
-        xxp[0] = xx[0] + dt * (xx[3] * cos_xx4 * np.cos(xx[2]) - xx[3] * sin_xx4 * np.sin(xx[2]))                                 
-        xxp[1] = xx[1] + dt * (xx[3] * cos_xx4 * np.sin(xx[2]) + xx[3] * sin_xx4 * np.cos(xx[2]))                                 
-        xxp[2] = xx[2] + dt * xx[5]                                                                                                           
-        xxp[3] = xx[3] + dt * ((Fy[1] * sin_xx4 + uu[1] * cos_xx4_minus_uu0 + Fy[0] * sin_xx4_minus_uu0)/mm)                     
-        xxp[4] = xx[4] + dt * ((Fy[1] * cos_xx4 + Fy[0] * cos_xx4_minus_uu0 - uu[1] * sin_xx4_minus_uu0)/(mm * xx[3]) - xx[5])   
-        xxp[5] = xx[5] + dt * (((uu[1] * np.sin(uu[0]) + Fy[0] * np.cos(uu[0])) * aa - Fy[1] * bb)/Iz)                                          
+        dFyx3 = ([mi*Fz[0]*dBetax3[0], mi*Fz[1]*dBetax3[1]])
+        dFyx4 = ([mi*Fz[0]*dBetax4[0], mi*Fz[1]*dBetax4[1]])
+        dFyx5 = ([mi*Fz[0]*dBetax5[0], mi*Fz[1]*dBetax5[1]])
+        dFyu0 = ([mi*Fz[0]*dBetau0[0], mi*Fz[1]*dBetau0[1]])
 
+        # Discrete-time nonlinear dynamics calculations for next state
+        xxp[0] = xx[0,0] + dt * (xx[3,0] * cos_xx4 * cos_xx2 - xx[3,0] * sin_xx4 * sin_xx2)                                 
+        xxp[1] = xx[1,0] + dt * (xx[3,0] * cos_xx4 * sin_xx2 + xx[3,0] * sin_xx4 * cos_xx2)                                 
+        xxp[2] = xx[2,0] + dt * xx[5,0]                                                                                                           
+        xxp[3] = xx[3,0] + dt * ((Fy[1] * sin_xx4 + uu[1,0] * cos_xx4_minus_uu0 + Fy[0] * sin_xx4_minus_uu0)/mm)                     
+        xxp[4] = xx[4,0] + dt * ((Fy[1] * cos_xx4 + Fy[0] * cos_xx4_minus_uu0 - uu[1,0] * sin_xx4_minus_uu0)/(mm * xx[3,0]) - xx[5,0])   
+        xxp[5] = xx[5,0] + dt * (((uu[1,0] * np.sin(uu[0,0]) + Fy[0] * np.cos(uu[0,0])) * aa - Fy[1] * bb)/Iz) 
+        
         # Gradient computation (for future use in optimization)
         # Gradient wrt xx and uu (df/dx and df/du)
         fx = np.zeros((ns, ns))
         fu = np.zeros((ni, ns))
     
-
         # Derivative of dynamics w.r.t. state (fx)
-        fx = np.array([
-            [1, 0, 0, 0, 0, 0],
-            [0, 1, 0, 0, 0, 0],
-            [dt*(-xx[3] * cos_xx4 * np.sin(xx[2]) - xx[3] * sin_xx4 * np.cos(xx[2])), 
-            dt*(xx[3] * cos_xx4 * np.cos(xx[2]) - xx[3] * sin_xx4 * np.sin(xx[2])), 1, 0, 0, 0],
-            [dt*(cos_xx4 * np.cos(xx[2]) - sin_xx4 * np.sin(xx[2])), 
-            dt*(cos_xx4 * np.sin(xx[2]) + sin_xx4 * np.cos(xx[2])), 0, 1, 
-            dt*((Fy[1] * cos_xx4 + Fy[0] * cos_xx4_minus_uu0 - uu[1] * sin_xx4_minus_uu0)*(-1/m_xx3_sq)), 0],
-            [dt*(-xx[3] * sin_xx4 * np.cos(xx[2]) - xx[3] * cos_xx4 * np.sin(xx[2])), 
-            dt*(-xx[3] * sin_xx4 * np.sin(xx[2]) + xx[3] * cos_xx4 * np.cos(xx[2])), 0, 
-            dt*((Fy[1] * cos_xx4 - uu[1] * sin_xx4_minus_uu0 + Fy[0] * cos_xx4_minus_uu0)/mm), 
-            1 + dt*((-Fy[1] * sin_xx4 - Fy[0] * sin_xx4_minus_uu0 - uu[1] * cos_xx4_minus_uu0)/(mm * xx[3])), 0],
-            [0, 0, dt, 0, -dt, 1]
-        ])
+        '''
+        fx[0,:] = [1, 0, 0, 0, 0, 0]
+        fx[1,:] = [0, 1, 0, 0, 0, 0]
+        fx[2,:] = [dt*(-xx[3,0] * cos_xx4 * sin_xx2 - xx[3,0] * sin_xx4 * cos_xx2), dt*(xx[3,0] * cos_xx4 * cos_xx2 - xx[3,0] * sin_xx4 * sin_xx2), 1, 0, 0, 0]
+        fx[3,:] = [dt*(cos_xx4 * cos_xx2 - sin_xx4 * sin_xx2), dt*(cos_xx4 * sin_xx2 + sin_xx4 * cos_xx2), 0, 1, dt*((Fy[1] * cos_xx4 + Fy[0] * cos_xx4_minus_uu0 - uu[1,0] * sin_xx4_minus_uu0)*(-1/m_xx3_sq)), 0]
+        fx[4,:] = [dt*(-xx[3,0] * sin_xx4 * cos_xx2 - xx[3,0] * cos_xx4 * sin_xx2), dt*(-xx[3,0] * sin_xx4 * sin_xx2 + xx[3,0] * cos_xx4 * cos_xx2), 0, dt*((Fy[1] * cos_xx4 - uu[1,0] * sin_xx4_minus_uu0 + Fy[0] * cos_xx4_minus_uu0)/mm), 1 + dt*((-Fy[1] * sin_xx4 - Fy[0] * sin_xx4_minus_uu0 - uu[1,0] * cos_xx4_minus_uu0)/(mm * xx[3,0])), 0]
+        fx[5,:] = [0, 0, dt, 0, -dt, 1]
+
+        fu = np.array([[0, 0, 0, dt*(uu[1,0] * np.sin(xx[4,0] - uu[0,0]) - Fy[0] * np.cos(xx[4,0] - uu[0,0]))/mm, dt*(Fy[0] * np.sin(xx[4,0] - uu[0,0]) + uu[1,0] * np.cos(xx[4,0] - uu[0,0]))/(mm * xx[3,0]),  dt*((uu[1,0] * np.cos(uu[0,0]) - Fy[0] * np.sin(uu[0,0])) *aa/Iz)],
+        [0, 0, 0, dt*np.cos(xx[4,0] - uu[0,0])/mm, dt*(- np.sin(xx[4,0] - uu[0,0]))/(mm * xx[3,0]), dt * np.sin(uu[0,0]) * aa/Iz]])
+
+        '''
+        fx[0,:] = [1, 0, 0, 0, 0, 0]
+        fx[1,:] = [0, 1, 0, 0, 0, 0]
+        fx[2,:] = [dt*(-xx[3,0] * cos_xx4 * sin_xx2 - xx[3,0] * sin_xx4 * cos_xx2), dt*(xx[3,0] * cos_xx4 * cos_xx2 - xx[3,0] * sin_xx4 * sin_xx2), 1, 0, 0, 0]
+        fx[3,:] = [dt*(cos_xx4 * cos_xx2 - sin_xx4 * sin_xx2), dt*(cos_xx4 * sin_xx2 + sin_xx4 * cos_xx2), 0, 1 + dt*((dFyx3[1]*sin_xx4 + dFyx3[0]*sin_xx4_minus_uu0)/mm), dt*(((dFyx3[1]*cos_xx4 + dFyx3[0]*cos_xx4_minus_uu0)*(mm * xx[3,0]) - mm*(Fy[1]*cos_xx4 + Fy[0]*cos_xx4_minus_uu0 - uu[1,0]*sin_xx4_minus_uu0))/((mm * xx[3,0])**2)), dt*(((dFyx3[0]*np.cos(uu[0,0]))*aa - dFyx3[1]*bb)/Iz)]
+        fx[4,:] = [dt*(-xx[3,0]*sin_xx4*cos_xx2 - xx[3,0]*cos_xx4*sin_xx2), dt*(-xx[3,0]*sin_xx4*sin_xx2 + xx[3,0]*cos_xx4*cos_xx2), 0, dt*((dFyx4[1]*sin_xx4 + Fy[1]*cos_xx4 - uu[1,0]*sin_xx4_minus_uu0 + dFyx4[0]*sin_xx4_minus_uu0 + Fy[0]*cos_xx4_minus_uu0)/mm), 1 + dt*((dFyx4[1]*cos_xx4 - Fy[1]*sin_xx4 + dFyx4[0]*cos_xx4_minus_uu0 - Fy[0]*sin_xx4_minus_uu0 - uu[1,0]*cos_xx4_minus_uu0)/(mm*xx[3,0])), dt*(((dFyx4[0]*np.cos(uu[0,0]))*aa - dFyx4[1]*bb)/Iz)]
+        fx[5,:] = [0, 0, dt, dt*((dFyx5[1]*sin_xx4 + dFyx5[0]*sin_xx4_minus_uu0)/mm), dt*((dFyx5[1]*cos_xx4 + dFyx5[0]*cos_xx4_minus_uu0)/(mm * xx[3,0]) - 1), 1 + dt*(((dFyx5[0]*np.cos(uu[0,0]))*aa - dFyx5[1]*bb)/Iz)]
+        # Derivative of dynamics w.r.t. inputs (fu)
+        fu[0,:] = [0, 0, 0, dt*((dFyu0[1]*sin_xx4 + uu[1,0]*sin_xx4_minus_uu0 + dFyu0[0]*sin_xx4_minus_uu0 - Fy[0]*cos_xx4_minus_uu0)/mm), dt*((dFyu0[1]*cos_xx4 + dFyu0[0]*cos_xx4_minus_uu0 + Fy[0]*sin_xx4_minus_uu0 + uu[1,0]*cos_xx4_minus_uu0)/(mm * xx[3,0])),  dt*(((uu[1,0]*np.cos(uu[0,0]) + dFyu0[0]*np.cos(uu[0,0]) - Fy[0]*np.sin(uu[0,0]))*aa - dFyu0[1]*bb)/Iz)]
+        fu[1,:] = [0, 0, 0, dt*cos_xx4_minus_uu0/mm, dt*(- sin_xx4_minus_uu0)/(mm * xx[3,0]), dt*np.sin(uu[0,0])*aa/Iz]
         
-        fu = np.array([[0, 0, 0, dt*(uu[1] * sin_xx4_minus_uu0 - Fy[0] * cos_xx4_minus_uu0)/mm, dt*(Fy[0] * sin_xx4_minus_uu0 + uu[1] * cos_xx4_minus_uu0)/(mm * xx[3]),  dt*((uu[1] * np.cos(uu[0]) - Fy[0] * np.sin(uu[0])) *aa/Iz)],
-                [0, 0, 0, dt*cos_xx4_minus_uu0/mm, dt*(- sin_xx4_minus_uu0)/(mm * xx[3]), dt * np.sin(uu[0]) * aa/Iz]])
         # Removing singleton dimensions for the next state
         xxp = xxp.squeeze()
 
@@ -128,7 +159,7 @@ def dynamics(xx, uu):
 
     else:
         """
-        Nonlinear dynamics of a pendulum
+        Nonlinear dynamics of aa pendulum
 
         Args:
             xx (numpy.ndarray): State at time t, R^2.
@@ -140,7 +171,7 @@ def dynamics(xx, uu):
             numpy.ndarray: Gradient of f wrt uu, at xx,uu.
         """
 
-        # Add a dimension for improving the compatibility of the code
+        # Add aa dimension for improving the compatibility of the code
         xx = xx[:, None]
         uu = uu[:, None]     
         

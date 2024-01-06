@@ -36,7 +36,7 @@ Rt = cst.RRt
 QT = cst.QQT
 
 def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = None, qqfin = None, ccin = None):
-        
+   
     """
     LQR for LTV system with (time-varying) affine cost
     
@@ -361,9 +361,7 @@ def Newton (xx_ref, uu_ref, max_iters):
     B = np.zeros((ns, ni, TT))
     d1l = np.zeros((ns, TT))
     d2l = np.zeros((ni, TT))
-    d11l = np.zeros((ns, ns, TT))
-    d22l = np.zeros((ni, ni, TT))
-    d12l = np.zeros((ni, ns, TT))
+
     cc = np.zeros((ns,TT))
 
     Qtilda = np.zeros((ns, ns, TT))
@@ -380,18 +378,17 @@ def Newton (xx_ref, uu_ref, max_iters):
 
     Dx = np.zeros((ns, TT, max_iters))
     Du = np.zeros((ni, TT, max_iters))
-    
+
     # initial conditions
-    for i in range(0,TT):
-        xx[:,i,0] = xx_ref[:,0]
-        uu[:,i,0] = uu_ref[:,0]
+    for tt in range(TT):
+        xx[:,tt,0] = xx_ref[:,0]
+        uu[:,tt,0] = uu_ref[:,0]
 
     x0 = np.copy(xx_ref[:,0])
-
+    kk = 0
     ################################################################################################################
     
     for kk in range(max_iters-1):
-
         J[kk] = 0
 
         # Parameters evaluation
@@ -410,12 +407,16 @@ def Newton (xx_ref, uu_ref, max_iters):
         lmbd_temp = cst.termcost(xx[:,TT-1,kk], xx_ref[:,TT-1])[1]
         lmbd[:,TT-1,kk] = lmbd_temp.squeeze()
 
+
         for tt in reversed(range(TT-1)):                        # integration backward in time
 
-            d1l[:,tt], d2l[:,tt] = cst.stagecost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[1:3]           
+            a, b = cst.stagecost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[1:3]           
 
-            lmbd_temp = A[:,:,tt].T@lmbd[:,tt+1,kk] + d1l[:,tt]       # costate equation
-            dJ_temp = B[:,:,tt].T@lmbd[:,tt+1,kk] + d2l[:,tt]         # gradient of J wrt u 
+            d1l[:,tt] = a.squeeze()
+            d2l[:,tt] = b.squeeze()
+
+            lmbd_temp = A[:,:,tt].T@lmbd[:,tt+1,kk][:,None] + a       # costate equation
+            dJ_temp = B[:,:,tt].T@lmbd[:,tt+1,kk][:,None] + b         # gradient of J wrt u 
             lmbd[:,tt,kk] = lmbd_temp.squeeze()
             dJ[:,tt,kk] = dJ_temp.squeeze()
 
@@ -424,7 +425,7 @@ def Newton (xx_ref, uu_ref, max_iters):
             Qtilda[:,:,tt], Rtilda[:,:,tt], Stilda[:,:,tt] = cst.stagecost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[3:]
         d1lT, QTilda = cst.termcost(xx[:,-1,kk], xx_ref[:,-1])[1:3]
 
-        Dx[:,:,kk], Du[:,:,kk] = ltv_LQR(A, B, Qtilda, Rtilda, Stilda, QTilda, TT, x0, d1l, d2l, d1lT, cc)
+        Dx[:,:,kk], Du[:,:,kk] = ltv_LQR(A, B, Qtilda, Rtilda, Stilda, QTilda, TT, x0, d1l, d2l, d1lT.squeeze(), cc)
 
         for tt in range(TT-1): 
             descent[kk] += Du[:,tt,kk].T@Du[:,tt,kk]
@@ -435,40 +436,40 @@ def Newton (xx_ref, uu_ref, max_iters):
         costs_armijo = []
 
         stepsize = stepsize_0
-        
-        for ii in range(armijo_maxiters):
+        if 1:
+            for ii in range(armijo_maxiters):
 
-            # temp solution update
+                # temp solution update
 
-            xx_temp = np.zeros((ns,TT))
-            uu_temp = np.zeros((ni,TT))
+                xx_temp = np.zeros((ns,TT))
+                uu_temp = np.zeros((ni,TT))
 
-            xx_temp[:,0] = x0
+                xx_temp[:,0] = x0
 
-            for tt in range(TT-1):
-                uu_temp[:,tt] = uu[:,tt,kk] + stepsize*Du[:,tt,kk]
-                xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+                for tt in range(TT-1):
+                    uu_temp[:,tt] = uu[:,tt,kk] + stepsize*Du[:,tt,kk]
+                    xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
-            # temp cost calculation
-            JJ_temp = 0
+                # temp cost calculation
+                JJ_temp = 0
 
-            for tt in range(TT-1):
-                temp_cost = cst.stagecost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt])[0]
+                for tt in range(TT-1):
+                    temp_cost = cst.stagecost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt])[0]
+                    JJ_temp += temp_cost
+
+                temp_cost = cst.termcost(xx_temp[:,-1], xx_ref[:,-1])[0]
                 JJ_temp += temp_cost
 
-            temp_cost = cst.termcost(xx_temp[:,-1], xx_ref[:,-1])[0]
-            JJ_temp += temp_cost
+                stepsizes.append(stepsize)                              # save the stepsize
+                costs_armijo.append(np.min([JJ_temp, 100*J[kk]]))       # save the cost associated to the stepsize
 
-            stepsizes.append(stepsize)                              # save the stepsize
-            costs_armijo.append(np.min([JJ_temp, 100*J[kk]]))       # save the cost associated to the stepsize
-
-            if JJ_temp > J[kk] + c*stepsize*descent_arm[kk]:
-                # update the stepsize
-                stepsize = beta*stepsize
-            
-            else:
-                print('Armijo stepsize = {:.3e}'.format(stepsize))
-                break
+                if JJ_temp > J[kk] + c*stepsize*descent_arm[kk]:
+                    # update the stepsize
+                    stepsize = beta*stepsize
+                
+                else:
+                    print('Armijo stepsize = {:.3e}'.format(stepsize))
+                    break
         
         # Armijo plot
         if armijo_plt:

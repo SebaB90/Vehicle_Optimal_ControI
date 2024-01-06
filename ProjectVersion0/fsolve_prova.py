@@ -1,8 +1,9 @@
 
 import numpy as np
 from scipy.optimize import fsolve
-def func(x):
-    return [x[0] * x[1] - 4,
-            x[1] * x[0] - x[1] - 5]
-root = fsolve(func, [-3, -6])
-print(root)
+
+for i in range (3):
+    d1l = []
+    a = [2,i]
+    d1l.append(a)
+    print(d1l)
