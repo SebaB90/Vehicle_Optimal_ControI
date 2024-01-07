@@ -380,16 +380,16 @@ def Newton (xx_ref, uu_ref, max_iters):
     Du = np.zeros((ni, TT, max_iters))
 
     # initial conditions
-    for tt in range(TT):
-        xx[:,tt,0] = xx_ref[:,0]
-        uu[:,tt,0] = uu_ref[:,0]
+    if ns == 6:
+        for tt in range(TT):
+            xx[:,tt,0] = xx_ref[:,0]
 
-    x0 = np.copy(xx_ref[:,0])
     kk = 0
     ################################################################################################################
     
     for kk in range(max_iters-1):
         J[kk] = 0
+        x0 = xx[:,0,kk]
 
         # Parameters evaluation
 
@@ -427,7 +427,7 @@ def Newton (xx_ref, uu_ref, max_iters):
 
         Dx[:,:,kk], Du[:,:,kk] = ltv_LQR(A, B, Qtilda, Rtilda, Stilda, QTilda, TT, x0, d1l, d2l, d1lT.squeeze(), cc)
 
-        for tt in range(TT-1): 
+        for tt in reversed(range(TT-1)): 
             descent[kk] += Du[:,tt,kk].T@Du[:,tt,kk]
             descent_arm[kk] += dJ[:,tt,kk].T@Du[:,tt,kk]    
 

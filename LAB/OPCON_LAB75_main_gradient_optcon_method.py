@@ -31,14 +31,14 @@ plt.rcParams.update({'font.size': 22})
 # Algorithm parameters
 #######################################
 
-max_iters = int(10)
+max_iters = int(2)
 stepsize_0 = 1
 
 # ARMIJO PARAMETERS
 cc = 0.5
 # beta = 0.5
 beta = 0.7
-armijo_maxiters = 20 # number of Armijo iterations
+armijo_maxiters = 10 # number of Armijo iterations
 
 term_cond = 1e-6
 
@@ -178,7 +178,6 @@ for kk in range(max_iters-1):
 
     at, bt = cst.stagecost(xx[:,tt, kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[1:]
     fx, fu = dyn.dynamics(xx[:,tt,kk], uu[:,tt,kk])[1:]
-    print(fx,'\n\n',fu)
 
     At = fx.T
     Bt = fu.T

@@ -27,6 +27,7 @@ cc = 0.5
 beta = 0.7
 armijo_maxiters = 20    # number of Armijo iterations
 stepsize_0 = 1          # initial stepsize
+armijo_plt = False
 
 
 def cost(xx, uu, xx_ref, uu_ref, Q, R):
@@ -148,44 +149,45 @@ def Gradient (xx, uu, xx_ref, uu_ref, Q, R, QT, max_iters):
         steps = np.linspace(0,stepsize_0,int(2e1))
         costs = np.zeros(len(steps))
 
-        for ii in range(len(steps)):
+        if armijo_plt: 
+            for ii in range(len(steps)):
 
-            step = steps[ii]
+                step = steps[ii]
 
-            # temp solution update
+                # temp solution update
 
-            xx_temp = np.zeros((ns,T))
-            uu_temp = np.zeros((ni,T))
+                xx_temp = np.zeros((ns,T))
+                uu_temp = np.zeros((ni,T))
 
-            xx_temp[:,0] = x0
+                xx_temp[:,0] = x0
 
-            for tt in range(T-1):
-                uu_temp[:,tt] = uu[:,tt,kk] + step*deltau[:,tt,kk]
-                xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+                for tt in range(T-1):
+                    uu_temp[:,tt] = uu[:,tt,kk] + step*deltau[:,tt,kk]
+                    xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
-            # temp cost calculation
-            JJ_temp = 0
+                # temp cost calculation
+                JJ_temp = 0
 
-            for tt in range(T-1):
-                temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
+                for tt in range(T-1):
+                    temp_cost = cost(xx_temp[:,tt], uu_temp[:,tt], xx_ref[:,tt], uu_ref[:,tt], Q, R)[0]
+                    JJ_temp += temp_cost
+
+                temp_cost = cost_f(xx_temp[:,-1], xx_ref[:,-1], QT)[0]
                 JJ_temp += temp_cost
 
-            temp_cost = cost_f(xx_temp[:,-1], xx_ref[:,-1], QT)[0]
-            JJ_temp += temp_cost
+                costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
 
-            costs[ii] = np.min([JJ_temp, 100*JJ[kk]])
-
-        plt.figure(1)
-        plt.clf()
-        plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')
-        plt.plot(steps, JJ[kk] + descent_arm[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
-        plt.plot(steps, JJ[kk] + cc*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$J(\\mathbf{u}^k) - stepsize*c*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
-        plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
-        plt.grid()
-        plt.xlabel('stepsize')
-        plt.legend()
-        plt.draw()
-        plt.show()
+            plt.figure(1)
+            plt.clf()
+            plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')
+            plt.plot(steps, JJ[kk] + descent_arm[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+            plt.plot(steps, JJ[kk] + cc*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$J(\\mathbf{u}^k) - stepsize*c*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+            plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
+            plt.grid()
+            plt.xlabel('stepsize')
+            plt.legend()
+            plt.draw()
+            plt.show()
 
         # Update the current solution
 
