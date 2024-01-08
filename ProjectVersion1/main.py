@@ -175,19 +175,17 @@ if ns == 6:
   # Then imposing V(x3) and Beta(x4) we evaluate the other states and inputs
 
   def equations(vars):
-    x5, u0, u1 = vars
-    Beta = [u0 - (x3*np.sin(x4) + aa*x5)/(x3*np.cos(x4)), - (x3*np.sin(x4) - bb*x5)/(x3*np.cos(x4))]              # Beta = [Beta_f, Beta_r]
-    Fz = [mm*gg*bb/(aa+bb), mm*gg*aa/(aa+bb)]                                                                             # Fz = [F_zf, F_zr]
-    Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                   # Fy = [F_yf, F_yr]
 
-    eq1 = (Fy[1] * np.sin(x4) + u1 * np.cos(x4 - u0) + Fy[0] * np.sin(x4 - u0))/mm                               # V dot (x3)
-    eq2 = (Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - u0) - u1 * np.sin(x4 - u0))/(mm * x3) - x5                   # Beta dot (x4)
-    eq3 = ((u1 * np.sin(u0) + Fy[0] * np.cos(u0)) * aa - Fy[1] * bb)/Iz                                           # Psi dot dot (x5)
+    Beta = [vars[1] - (x3*np.sin(x4) + aa*vars[0])/(x3*np.cos(x4)), - (x3*np.sin(x4) - bb*vars[0])/(x3*np.cos(x4))]               # Beta = [Beta_f, Beta_r]
+    Fz = [mm*gg*bb/(aa+bb), mm*gg*aa/(aa+bb)]                                                                         # Fz = [F_zf, F_zr]
+    Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                         # Fy = [F_yf, F_yr]
 
-    return [eq1, eq2, eq3]
+    return [((Fy[1] * np.sin(x4) + vars[2] * np.cos(x4 - vars[1]) + Fy[0] * np.sin(x4 - vars[1]))/mm) - x3, 
+            (Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - vars[1]) - vars[2] * np.sin(x4 - vars[1]))/(mm * x3) - vars[0] - x4, 
+            ((vars[2] * np.sin(vars[1]) + Fy[0] * np.cos(vars[1])) * aa - Fy[1] * bb)/Iz - vars[0]]
 
   # Initial guess for the fsolve evaluation
-  initial_guess = [0, 0, 5]  # [x5(0), u0(0), u1(0)]
+  initial_guess = [0.1, 0.1, 5]  # [x5(0), u0(0), u1(0)]
 
   #######################
   # FIRST EQUILIBRIUM
@@ -195,11 +193,11 @@ if ns == 6:
 
   # Imposing x3 and x4 we evaluate the other parameters
   x3 = 3                  
-  x4 = 0
+  x4 = 0.05
 
   eq[3,0] = np.copy(x3)                           # V
   eq[4,0] = np.copy(x4)                           # beta
-  eq[5:,0] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
+  eq[5:,0] = fsolve(equations, [0.1, 0.1, 5])     # psi dot, steering angle, force
   eq[2,0] = eq[5,0]*int(tf/2)                               # psi   
   eq[0,0] =(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*int(tf/2)     # x
   eq[1,0] =(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*int(tf/2)     # y
@@ -208,11 +206,11 @@ if ns == 6:
   # SECOND EQUILIBRIUM
   #######################
   x3 = 5
-  x4 = 0
+  x4 = 0.1
 
   eq[3,1] = np.copy(x3)                           # V
   eq[4,1] = np.copy(x4)                           # beta
-  eq[5:,1] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
+  eq[5:,1] = fsolve(equations, [0, 0, 5])     # psi dot, steering angle, force
   eq[2,1] = eq[5,1]*int(tf/2)                               # psi   
   eq[0,1] =(eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*int(tf/2)     # x
   eq[1,1] =(eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*int(tf/2)     # y
@@ -355,7 +353,6 @@ uu = np.zeros((ni, TT, max_iters+1))   # input seq.
 if ns == 6:
   for tt in range(TT):
     xx[:,tt,0] = np.copy(xx_ref[:,0]) 
-    uu[:,tt,0] = np.copy(uu_ref[:,0])
 
 x0 = np.copy(xx_ref[:,0])
 

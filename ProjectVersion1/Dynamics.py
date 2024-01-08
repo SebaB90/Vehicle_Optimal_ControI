@@ -68,7 +68,7 @@ def dynamics(xx, uu):
         
         # Preallocate the next state vector
         xxp = np.zeros((ns,1))
-        '''
+        
         # Pre-compute repeated terms for efficiency
         cos_xx4 = np.cos(xx[4,0])
         sin_xx4 = np.sin(xx[4,0])
@@ -163,7 +163,7 @@ def dynamics(xx, uu):
         # Derivative of dynamics w.r.t. inputs (fu)
         fu[0,:] = [0, 0, 0, dt*(-bb*gg*mi*mm*(uu[0,0] - (aa*xx[5,0] + xx[3,0]*np.sin(xx[4,0]))/(xx[3,0]*np.cos(xx[4,0])))*np.cos(uu[0,0] - xx[4,0])/(aa + bb) - bb*gg*mi*mm*np.sin(uu[0,0] - xx[4,0])/(aa + bb) - uu[1,0]*np.sin(uu[0,0] - xx[4,0]))/mm, dt*(-bb*gg*mi*mm*(uu[0,0] - (aa*xx[5,0] + xx[3,0]*np.sin(xx[4,0]))/(xx[3,0]*np.cos(xx[4,0])))*np.sin(uu[0,0] - xx[4,0])/(aa + bb) + bb*gg*mi*mm*np.cos(uu[0,0] - xx[4,0])/(aa + bb) + uu[1,0]*np.cos(uu[0,0] - xx[4,0]))/(mm*xx[3,0]), aa*dt*(-bb*gg*mi*mm*(uu[0,0] - (aa*xx[5,0] + xx[3,0]*np.sin(xx[4,0]))/(xx[3,0]*np.cos(xx[4,0])))*np.sin(uu[0,0])/(aa + bb) + bb*gg*mi*mm*np.cos(uu[0,0])/(aa + bb) + uu[1,0]*np.cos(uu[0,0]))/Iz]
         fu[1,:] = [0, 0, 0, dt*np.cos(uu[0,0] - xx[4,0])/mm, dt*np.sin(uu[0,0] - xx[4,0])/(mm*xx[3,0]), aa*dt*np.sin(uu[0,0])/Iz]    
-        
+        '''
         # Removing singleton dimensions for the next state
         xxp = xxp.squeeze()
 

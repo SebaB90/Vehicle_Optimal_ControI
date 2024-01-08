@@ -382,7 +382,7 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
     Qtilda = np.zeros((ns, ns, TT))
     Rtilda = np.zeros((ni, ni, TT))
     Stilda = np.zeros((ni, ns, TT))
-    
+
     lmbd = np.zeros((ns, TT, max_iters+1))    # lambdas - costate seq.
 
     dJ = np.zeros((ni,TT, max_iters+1))       # DJ - gradient of J wrt u
@@ -394,7 +394,7 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
     Du = np.zeros((ni, TT, max_iters+1))
 
     ################################################################################################################
-    
+
     for kk in range(max_iters):
         J[kk] = 0
 
