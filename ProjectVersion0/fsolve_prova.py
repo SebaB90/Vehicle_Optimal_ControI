@@ -34,3 +34,8 @@ fu1 = [diff(xxp[0],u1), diff(xxp[1],u1), diff(xxp[2],u1), diff(xxp[3],u1), diff(
 
 
 print (fx0,'\n\n', fx1,'\n\n', fx2,'\n\n', fx3,'\n\n', fx4,'\n\n', fx5,'\n\n', fu0,'\n\n', fu1)
+
+
+
+
+

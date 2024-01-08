@@ -42,12 +42,12 @@ b = 1.029   #m
 mi = 1      #nodim
 g = 9.81    #m/s^2
 
-TT = dyn.TT            #discrete time samples
+tf = dyn.TT            #discrete time samples
 T = dyn.T              #time instants
 T_mid = dyn.T_mid      #half time
 term_cond = 1e-6       #terminal condition
 
-plot = False
+plot = True
 Task0 = False
 
 if Task0 :
@@ -83,11 +83,11 @@ if Task0 :
         axs[0].set_ylabel('$y$')
         axs[0].set_xlabel('$x$')
 
-        axs[1].plot(np.linspace(0, TT, num_steps), x_traj, 'g', linewidth=2)
+        axs[1].plot(np.linspace(0, tf, num_steps), x_traj, 'g', linewidth=2)
         axs[1].grid()
         axs[1].set_ylabel('$x$')
         
-        axs[2].plot(np.linspace(0, TT, num_steps), y_traj, 'g', linewidth=2)
+        axs[2].plot(np.linspace(0, tf, num_steps), y_traj, 'g', linewidth=2)
         axs[2].grid()
         axs[2].set_ylabel('$y$')
         axs[2].set_xlabel('time')
@@ -141,7 +141,7 @@ initial_guess = [0.1, 0.1, 0]          # [x5(0), u0(0), u1(0)]
 
 # calculation of the parameters at equilibrium
 def equations(vars):
-    x4, u0, u1 = vars
+    x5, u0, u1 = vars
     Beta = [u0 - (x3*np.sin(x4) + a*x5)/(x3*np.cos(x4)), - (x3*np.sin(x4) - b*x5)/(x3*np.cos(x4))]              # Beta = [Beta_f, Beta_r]
     Fz = [m*g*b/(a+b), m*g*a/(a+b)]                                                                             # Fz = [F_zf, F_zr]
     Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                   # Fy = [F_yf, F_yr]
@@ -157,28 +157,25 @@ def equations(vars):
 # FIRST EQUILIBRIUM
 #imposing x3 and x4
 x3 = 3                  
-x5 = 0
+x4 = 0.1
 
 eq[3,0] = np.copy(x3)                           # V
-eq[5,0] = np.copy(x5)                           # psi dot
-eq[4,0] = fsolve(equations, initial_guess)[0]   # beta
-eq[6:,0] = fsolve(equations, initial_guess)[1:] # steering angle, force
-eq[2,0] = eq[5,0]*T_mid                         # psi   
-eq[0,0] = (eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*T_mid     # x
-eq[1,0] = (eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*T_mid     # y
+eq[4,0] = np.copy(x4)                           # beta
+eq[5:,0] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
+eq[2,0] = eq[5,0]*int(tf/2)                               # psi   
+eq[0,0] =(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*int(tf/2)     # x
+eq[1,0] =(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*int(tf/2)     # y
 
 # SECOND EQUILIBRIUM
 x3 = 5                 
-x5 = 0.2
+x4 = 0.25
 
-eq[3,1] = np.copy(x3)
-eq[5,1] = np.copy(x5)                              
-eq[4,1] = fsolve(equations, initial_guess)[0]                           
-eq[6:,1] = fsolve(equations, initial_guess)[1:] 
-eq[2,1] = eq[2,0] + eq[5,1]*T_mid    
-eq[0,1] = eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*T_mid
-eq[1,1] = eq[1,0] + (eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*T_mid
-
+eq[3,1] = np.copy(x3)                           # V
+eq[4,1] = np.copy(x4)                           # beta
+eq[5:,1] = fsolve(equations, initial_guess)     # psi dot, steering angle, force
+eq[2,1] = eq[5,1]*int(tf/2)                               # psi   
+eq[0,1] =(eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*int(tf/2)     # x
+eq[1,1] =(eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*int(tf/2)     # y
 
 # Print the result
 print('Equilibrium 1:', eq[0:,0], '\nEquilibrium 2:', eq[0:,1])

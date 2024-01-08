@@ -29,27 +29,27 @@ stepsize_0 = 1          # initial stepsize
 armijo_plt = True      # plot
 
 
-def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None, qqfin = None, ccin = None):
-
+def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = None, qqfin = None, ccin = None):
+   
     """
-        LQR for LTV system with (time-varying) affine cost
-        
+    LQR for LTV system with (time-varying) affine cost
+    
     Args
-        - AAin (nn x nn (x T)) matrix
-        - BBin (nn x mm (x T)) matrix
-        - QQin (nn x nn (x T)), RR (mm x mm (x T)), SS (mm x nn (x T)) stage cost
-        - QQfin (nn x nn) terminal cost
-        - qq (nn x (x T)) affine terms
-        - rr (mm x (x T)) affine terms
-        - qqf (nn x (x T)) affine terms - final cost
-        - T time horizon
+    - AAin (nn x nn (x TT)) matrix
+    - BBin (nn x mm (x TT)) matrix
+    - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
+    - QQfin (nn x nn) terminal cost
+    - qq (nn x (x TT)) affine terms
+    - rr (mm x (x TT)) affine terms
+    - qqf (nn x (x TT)) affine terms - final cost
+    - TT time horizon
     Return
-        - KK (mm x nn x T) optimal gain sequence
-        - PP (nn x nn x T) riccati matrix
+    - KK (mm x nn x TT) optimal gain sequence
+    - PP (nn x nn x TT) riccati matrix
     """
-         
+        
     try:
-        # check if matrix is (.. x .. x T) - 3 dimensional array 
+        # check if matrix is (.. x .. x TT) - 3 dimensional array 
         ns, lA = AAin.shape[1:]
     except:
         # if not 3 dimensional array, make it (.. x .. x 1)
@@ -95,16 +95,178 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None
         exit()
 
 
-    if lA < T:
-        AAin = AAin.repeat(T, axis=2)
-    if lB < T:
-        BBin = BBin.repeat(T, axis=2)
-    if lQ < T:
-        QQin = QQin.repeat(T, axis=2)
-    if lR < T:
-        RRin = RRin.repeat(T, axis=2)
-    if lS < T:
-        SSin = SSin.repeat(T, axis=2)
+    if lA < TT:
+        AAin = AAin.repeat(TT, axis=2)
+    if lB < TT:
+        BBin = BBin.repeat(TT, axis=2)
+    if lQ < TT:
+        QQin = QQin.repeat(TT, axis=2)
+    if lR < TT:
+        RRin = RRin.repeat(TT, axis=2)
+    if lS < TT:
+        SSin = SSin.repeat(TT, axis=2)
+
+
+    KK = np.zeros((ni, ns, TT))
+    sigma = np.zeros((ni, TT))
+    PP = np.zeros((ns, ns, TT))
+    pp = np.zeros((ns, TT))
+
+    QQ = QQin
+    RR = RRin
+    SS = SSin
+    QQf = QQfin
+    
+    qq = qqin
+    rr = rrin
+
+    qqf = qqfin
+
+    AA = AAin
+    BB = BBin
+
+    xx = np.zeros((ns, TT))
+    uu = np.zeros((ni, TT))
+
+    xx[:,0] = x0
+    
+    PP[:,:,-1] = QQf
+    pp[:,-1] = qqf
+    
+    # Solve Riccati equation
+    for tt in reversed(range(TT-1)):
+        QQt = QQ[:,:,tt]
+        qqt = qq[:,tt][:,None]
+        RRt = RR[:,:,tt]
+        rrt = rr[:,tt][:,None]
+        AAt = AA[:,:,tt]
+        BBt = BB[:,:,tt]
+        SSt = SS[:,:,tt]
+        PPtp = PP[:,:,tt+1]
+        pptp = pp[:, tt+1][:,None]
+
+        MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
+        mmt = rrt + BBt.T @ pptp
+        
+        PPt = AAt.T @ PPtp @ AAt - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ (BBt.T@PPtp@AAt + SSt) + QQt
+        ppt = AAt.T @ pptp - (BBt.T@PPtp@AAt + SSt).T @ MMt_inv @ mmt + qqt
+
+        PP[:,:,tt] = PPt
+        pp[:,tt] = ppt.squeeze()
+
+
+    # Evaluate KK
+    
+    for tt in range(TT-1):
+        QQt = QQ[:,:,tt]
+        qqt = qq[:,tt][:,None]
+        RRt = RR[:,:,tt]
+        rrt = rr[:,tt][:,None]
+        AAt = AA[:,:,tt]
+        BBt = BB[:,:,tt]
+        SSt = SS[:,:,tt]
+
+        PPtp = PP[:,:,tt+1]
+        pptp = pp[:,tt+1][:,None]
+
+        # Check positive definiteness
+
+        MMt_inv = np.linalg.inv(RRt + BBt.T @ PPtp @ BBt)
+        mmt = rrt + BBt.T @ pptp
+
+        # for other purposes we could add a regularization step here...
+
+        KK[:,:,tt] = -MMt_inv@(BBt.T@PPtp@AAt + SSt)
+        sigma_t = -MMt_inv@mmt
+
+        sigma[:,tt] = sigma_t.squeeze()
+
+
+
+    for tt in range(TT - 1):
+        # Trajectory
+
+        uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
+        xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
+
+        xx[:,tt+1] = xx_p
+
+    '''
+
+    """
+        LQR for LTV system with (time-varying) affine cost
+        
+    Args
+        - AAin (nn x nn (x TT)) matrix
+        - BBin (nn x mm (x TT)) matrix
+        - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
+        - QQfin (nn x nn) terminal cost
+        - qq (nn x (x TT)) affine terms
+        - rr (mm x (x TT)) affine terms
+        - qqf (nn x (x TT)) affine terms - final cost
+        - TT time horizon
+    Return
+        - KK (mm x nn x TT) optimal gain sequence
+        - PP (nn x nn x TT) riccati matrix
+    """
+         
+    try:
+        # check if matrix is (.. x .. x TT) - 3 dimensional array 
+        ns, lA = AAin.shape[1:]
+    except:
+        # if not 3 dimensional array, make it (.. x .. x 1)
+        AAin = AAin[:,:,None]
+        ns, lA = AAin.shape[1:]
+
+    try:  
+        ni, lB = BBin.shape[1:]
+    except:
+        BBin = BBin[:,:,None]
+        ni, lB = BBin.shape[1:]
+
+    try:
+        nQ, lQ = QQin.shape[1:]
+    except:
+        QQin = QQin[:,:,None]
+        nQ, lQ = QQin.shape[1:]
+
+    try:
+        nR, lR = RRin.shape[1:]
+    except:
+        RRin = RRin[:,:,None]
+        nR, lR = RRin.shape[1:]
+
+    try:
+        nSi, nSs, lS = SSin.shape
+    except:
+        SSin = SSin[:,:,None]
+        nSi, nSs, lS = SSin.shape
+
+    # Check dimensions consistency -- safety
+    if nQ != ns:
+        print("Matrix Q does not match number of states")
+        exit()
+    if nR != ni:
+        print("Matrix R does not match number of inputs")
+        exit()
+    if nSs != ns:
+        print("Matrix S does not match number of states")
+        exit()
+    if nSi != ni:
+        print("Matrix S does not match number of inputs")
+        exit()
+
+
+    if lA < TT:
+        AAin = AAin.repeat(TT, axis=2)
+    if lB < TT:
+        BBin = BBin.repeat(TT, axis=2)
+    if lQ < TT:
+        QQin = QQin.repeat(TT, axis=2)
+    if lR < TT:
+        RRin = RRin.repeat(TT, axis=2)
+    if lS < TT:
+        SSin = SSin.repeat(TT, axis=2)
 
     # Check for affine terms
 
@@ -114,10 +276,10 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None
         augmented = True
         print("Augmented term!")
 
-    KK = np.zeros((ni, ns, T))
-    sigma = np.zeros((ni, T))
-    PP = np.zeros((ns, ns, T))
-    pp = np.zeros((ns, T))
+    KK = np.zeros((ni, ns, TT))
+    sigma = np.zeros((ni, TT))
+    PP = np.zeros((ns, ns, TT))
+    pp = np.zeros((ns, TT))
 
     QQ = QQin
     RR = RRin
@@ -133,8 +295,8 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None
     AA = AAin
     BB = BBin
 
-    xx = np.zeros((ns, T))
-    uu = np.zeros((ni, T))
+    xx = np.zeros((ns, TT))
+    uu = np.zeros((ni, TT))
 
     xx[:,0] = x0
     
@@ -143,7 +305,7 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None
 
     # Evaluate KK and PP
     
-    for tt in reversed(range(T-1)):
+    for tt in reversed(range(TT-1)):
         QQt = QQ[:,:,tt]
         qqt = qq[:,tt][:,None]
         RRt = RR[:,:,tt]
@@ -172,12 +334,13 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, T, x0, qqin = None, rrin = None
         pp[:,tt] = ppt.squeeze()
        
 
-    for tt in range(T - 1):
+    for tt in range(TT - 1):
         # Trajectory
         uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
         xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
 
         xx[:,tt+1] = xx_p
+    '''
 
     return xx, uu
 
