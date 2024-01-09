@@ -44,7 +44,7 @@ ni = dyn.ni  # Get the number of input from the dynamics
 TT = dyn.TT  # Number of discrete-time samples
 TT_mid = dyn.TT_mid
 
-max_iters = 10
+max_iters = 15
 
 ############################################################
 # TESTS
@@ -180,9 +180,9 @@ if ns == 6:
     Fz = [mm*gg*bb/(aa+bb), mm*gg*aa/(aa+bb)]                                                                         # Fz = [F_zf, F_zr]
     Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                         # Fy = [F_yf, F_yr]
 
-    return [((Fy[1] * np.sin(x4) + vars[2] * np.cos(x4 - vars[1]) + Fy[0] * np.sin(x4 - vars[1]))/mm) - x3, 
-            (Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - vars[1]) - vars[2] * np.sin(x4 - vars[1]))/(mm * x3) - vars[0] - x4, 
-            ((vars[2] * np.sin(vars[1]) + Fy[0] * np.cos(vars[1])) * aa - Fy[1] * bb)/Iz - vars[0]]
+    return [((Fy[1] * np.sin(x4) + vars[2] * np.cos(x4 - vars[1]) + Fy[0] * np.sin(x4 - vars[1]))/mm), 
+            (Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - vars[1]) - vars[2] * np.sin(x4 - vars[1]))/(mm * x3) - vars[0], 
+            ((vars[2] * np.sin(vars[1]) + Fy[0] * np.cos(vars[1])) * aa - Fy[1] * bb)/Iz]
 
   # Initial guess for the fsolve evaluation
   initial_guess = [0.1, 0.1, 5]  # [x5(0), u0(0), u1(0)]
@@ -193,7 +193,7 @@ if ns == 6:
 
   # Imposing x3 and x4 we evaluate the other parameters
   x3 = 3                  
-  x4 = 0.05
+  x4 = 0.02
 
   eq[3,0] = np.copy(x3)                           # V
   eq[4,0] = np.copy(x4)                           # beta
@@ -206,14 +206,14 @@ if ns == 6:
   # SECOND EQUILIBRIUM
   #######################
   x3 = 5
-  x4 = 0.1
+  x4 = 0.07
 
   eq[3,1] = np.copy(x3)                           # V
   eq[4,1] = np.copy(x4)                           # beta
-  eq[5:,1] = fsolve(equations, [0, 0, 5])     # psi dot, steering angle, force
-  eq[2,1] = eq[5,1]*int(tf/2)                               # psi   
-  eq[0,1] =(eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*int(tf/2)     # x
-  eq[1,1] =(eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*int(tf/2)     # y
+  eq[5:,1] = fsolve(equations, [0.1, 0.1, 5])     # psi dot, steering angle, force
+  eq[2,1] = eq[2,0] + eq[5,1]*int(tf/2)                               # psi   
+  eq[0,1] = eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*int(tf/2)     # x
+  eq[1,1] = eq[1,0] + (eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*int(tf/2)     # y
 
   xx_eq = eq[:ns,:]
   uu_eq = eq[ns:,:]
@@ -238,7 +238,7 @@ if ns == 6:
   # Step reference signal - for all the states
 
   for tt in range(1,TT):
-  
+
     traj = dyn.dynamics(traj_ref[:6,tt-1], traj_ref[6:,tt-1])[0]
     traj_ref[:3, tt] = traj[:3]     # used to update x, y, psi
 
@@ -248,8 +248,10 @@ if ns == 6:
     else:  
       traj_ref[3:, tt] = eq[3:,1]
 
+
   xx_ref = traj_ref[0:6,:]
   uu_ref = traj_ref[6:,:]
+
 
   # Plot of the reference trajcetory
   tt_hor = np.linspace(0,tf,TT)
@@ -352,13 +354,13 @@ uu = np.zeros((ni, TT, max_iters+1))   # input seq.
 # initial conditions
 if ns == 6:
   for tt in range(TT):
-    xx[:,tt,0] = np.copy(xx_ref[:,0]) 
+    xx[:,tt,0] = np.copy(xx_ref[:,0])
+    uu[:,tt,0] = np.copy(uu_ref[:,0]) 
 
 x0 = np.copy(xx_ref[:,0])
-
+# xx, uu, descent, JJ, kk = grad.Gradient(xx, uu, xx_ref, uu_ref, cst.QQt, cst.RRt, cst.QQT, max_iters)
 xx, uu, descent, JJ, kk = nwtn.Newton(xx, uu, xx_ref, uu_ref, x0, max_iters)
 
-print(uu[:,0,:kk+1],'\n\n', xx[3,0,:kk+1], xx[3,-1,:kk+1])
 xx_star = xx[:,:,kk]
 uu_star = uu[:,:,kk]
 uu_star[:,-1] = uu_star[:,-3]        # for plotting purposes
@@ -648,10 +650,10 @@ for tt in range (TT):
   A_opt[:,:,tt] = fx.T
   B_opt[:,:,tt] = fu.T
 
-  Qt_reg[:,:,tt] = 0.1*np.diag([1, 1, 100, 1, 100, 100])
-  Rt_reg[:,:,tt] = 0.01*np.diag([100, 1])
+  Qt_reg[:,:,tt] = cst.QQt
+  Rt_reg[:,:,tt] = cst.RRt
 
-QT_reg = Qt_reg[:,:,-1]
+QT_reg = cst.QQT
 
 
 def lti_LQR(AA, BB, QQ, RR, QQf, TT):
@@ -779,7 +781,7 @@ plt.show()
 #######################################################################
 Tsim = TT
 
-def linear_mpc(AA, BB, QQ, RR, QQf, xxt, umax, umin, x1_max, x1_min, x2_max, x2_min, T_pred):
+def linear_mpc(AA, BB, QQ, RR, QQf, xxt, umax, umin, xmax, xmin, T_pred):
   """
   Linear MPC solver - Constrained LQR
 
@@ -808,13 +810,10 @@ def linear_mpc(AA, BB, QQ, RR, QQf, xxt, umax, umin, x1_max, x1_min, x2_max, x2_
 
   for tt in range(T_pred-1):
     cost += cp.quad_form(xx_mpc[:,tt], QQ) + cp.quad_form(uu_mpc[:,tt], RR)
-    constr += [xx_mpc[:,tt+1] == AA@xx_mpc[:,tt] + BB@uu_mpc[:,tt], # dynamics constraint
-            uu_mpc[:,tt] <= umax, # other constraints
-            uu_mpc[:,tt] >= umin,
-            xx_mpc[0,tt] <= x1_max,
-            xx_mpc[0,tt] >= x1_min,
-            xx_mpc[1,tt] <= x2_max,
-            xx_mpc[1,tt] >= x2_min]
+    constr += [xx_mpc[:,tt+1] == AA[:,:,tt]@xx_mpc[:,tt] + BB[:,:,tt]@uu_mpc[:,tt], # dynamics constraint
+            uu_mpc[1,tt] >= umin,
+            xx_mpc[4,tt] <= xmax]
+
   # sums problem objectives and concatenates constraints.
   cost += cp.quad_form(xx_mpc[:,T_pred-1], QQf)
   constr += [xx_mpc[:,0] == xxt]
@@ -832,12 +831,12 @@ def linear_mpc(AA, BB, QQ, RR, QQf, xxt, umax, umin, x1_max, x1_min, x2_max, x2_
 # Model Predictive Control
 #############################
 
-T_pred = 20       # MPC Prediction horizon
-umax = 100
-umin = -umax
+T_pred = 100       # MPC Prediction horizon
+u1max = 600
+u1min = 0
 
-x2max = 2
-x2min = -x2max
+x4max = 0.15
+x4min = 0
 
 xx_real_mpc = np.zeros((ns,Tsim))
 uu_real_mpc = np.zeros((ni,Tsim))
@@ -853,14 +852,12 @@ for tt in range(Tsim-1):
 
   # Solve MPC problem - apply first input
 
-  if tt%5 == 0: # print every 5 time instants
-    print('MPC:\t t = {}'.format(tt))
+  if tt%500 == 0: # print every 5 time instants
+    print('MPC:\t t = {}'.format(tt*dt))
 
-  uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, cst.QQt, cst.RRt, cst.QQT, xx_t_mpc, umax=umax, umin=umin, x2_min = x2min, x2_max = x2max, T_pred = T_pred)[:2]
+  uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, cst.QQt, cst.RRt, cst.QQT, xx_t_mpc, umax=u1max, umin=u1min, xmax = x4max, xmin = x4min, T_pred = T_pred)[:2]
   
   xx_real_mpc[:,tt+1] = dyn.dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
-
-
 
 #######################################
 # Plots
@@ -873,62 +870,31 @@ fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 axs[0].plot(time, xx_real_mpc[0,:], linewidth=2)
 axs[0].plot(time, xx_star[0,:],'--r', linewidth=2)
 axs[0].grid()
-axs[0].set_ylabel('$x_1$')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[0].set_ylim([-10,10])
-
+axs[0].set_ylabel('$x$')
 axs[0].set_xlim([-1,Tsim])
 axs[0].legend(['MPC', 'OPT'])
 
 #####
 axs[1].plot(time, xx_real_mpc[1,:], linewidth=2)
 axs[1].plot(time, xx_star[1,:], '--r', linewidth=2)
-
-if x2max < 1.1*np.amax(xx_real_mpc[1,:]): # draw constraints only if active
-  axs[1].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
-  axs[1].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
-
 axs[1].grid()
-axs[1].set_ylabel('$x_2$')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[1].set_ylim([-10,10])
-
+axs[1].set_ylabel('$y$')
 axs[1].set_xlim([-1,Tsim])
 axs[1].legend(['MPC', 'OPT'])
 
 #####
 axs[2].plot(time, xx_real_mpc[2,:], linewidth=2)
 axs[2].plot(time, xx_star[2,:], '--r', linewidth=2)
-
-if x2max < 1.1*np.amax(xx_real_mpc[2,:]): # draw constraints only if active
-  axs[2].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
-  axs[2].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
-
 axs[2].grid()
-axs[2].set_ylabel('$x_2$')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[2].set_ylim([-10,10])
-
+axs[2].set_ylabel('$psi$')
 axs[2].set_xlim([-1,Tsim])
 axs[2].legend(['MPC', 'OPT'])
 
 #####
 axs[3].plot(time, xx_real_mpc[3,:], linewidth=2)
 axs[3].plot(time, xx_star[3,:], '--r', linewidth=2)
-
-if x2max < 1.1*np.amax(xx_real_mpc[3,:]): # draw constraints only if active
-  axs[3].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
-  axs[3].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
-
 axs[3].grid()
-axs[3].set_ylabel('$x_2$')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[3].set_ylim([-10,10])
-
+axs[3].set_ylabel('$V$')
 axs[3].set_xlim([-1,Tsim])
 axs[3].legend(['MPC', 'OPT'])
 
@@ -936,72 +902,45 @@ axs[3].legend(['MPC', 'OPT'])
 axs[4].plot(time, xx_real_mpc[4,:], linewidth=2)
 axs[4].plot(time, xx_star[4,:], '--r', linewidth=2)
 
-if x2max < 1.1*np.amax(xx_real_mpc[4,:]): # draw constraints only if active
-  axs[4].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
-  axs[4].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
+if x4max < 1.1*np.amax(xx_real_mpc[4,:]): # draw constraints only if active
+  axs[4].plot(time, np.ones(Tsim)*x4max, '--g', linewidth=1)
+  axs[1].plot(time, np.ones(Tsim)*x4min, '--g', linewidth=1)
 
 axs[4].grid()
-axs[4].set_ylabel('$x_2$')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[4].set_ylim([-10,10])
-
+axs[4].set_ylabel('$beta$')
 axs[4].set_xlim([-1,Tsim])
 axs[4].legend(['MPC', 'OPT'])
 
 #####
 axs[5].plot(time, xx_real_mpc[5,:], linewidth=2)
 axs[5].plot(time, xx_star[5,:], '--r', linewidth=2)
-
-if x2max < 1.1*np.amax(xx_real_mpc[5,:]): # draw constraints only if active
-  axs[5].plot(time, np.ones(Tsim)*x2max, '--g', linewidth=1)
-  axs[5].plot(time, np.ones(Tsim)*x2min, '--g', linewidth=1)
-
 axs[5].grid()
-axs[5].set_ylabel('$x_2$')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[5].set_ylim([-10,10])
-
+axs[5].set_ylabel('$psi dot$')
 axs[5].set_xlim([-1,Tsim])
 axs[5].legend(['MPC', 'OPT'])
 
 #####
 axs[6].plot(time, uu_real_mpc[0,:],'g', linewidth=2)
 axs[6].plot(time, uu_star[0,:],'--r', linewidth=2)
-
-if umax < 1.1*np.amax(uu_real_mpc[0,:]): # draw constraints only if active
-  axs[6].plot(time, np.ones(Tsim)*umax, '--g', linewidth=1)
-  axs[6].plot(time, np.ones(Tsim)*umin, '--g', linewidth=1)
-
 axs[6].grid()
-axs[6].set_ylabel('$u$')
+axs[6].set_ylabel('$delta$')
 axs[6].set_xlabel('time')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[6].set_ylim([-10,10])
-
 axs[6].set_xlim([-1,Tsim])
-axs[6].legend(['MPC', 'LQR'])
+axs[6].legend(['MPC', 'OPT'])
 
 #####
 axs[7].plot(time, uu_real_mpc[1,:],'g', linewidth=2)
 axs[7].plot(time, uu_star[1,:],'--r', linewidth=2)
 
-if umax < 1.1*np.amax(uu_real_mpc[1,:]): # draw constraints only if active
-  axs[7].plot(time, np.ones(Tsim)*umax, '--g', linewidth=1)
-  axs[7].plot(time, np.ones(Tsim)*umin, '--g', linewidth=1)
+if u1max < 1.1*np.amax(uu_real_mpc[1,:]): # draw constraints only if active
+  axs[7].plot(time, np.ones(Tsim)*u1max, '--g', linewidth=1)
+  axs[7].plot(time, np.ones(Tsim)*u1min, '--g', linewidth=1)
 
 axs[7].grid()
-axs[7].set_ylabel('$u$')
+axs[7].set_ylabel('$F$')
 axs[7].set_xlabel('time')
-
-if 1 or np.amax(xx_star[0,:]) > 100: # set lims only if neededs
-  axs[7].set_ylim([-10,10])
-
 axs[7].set_xlim([-1,Tsim])
-axs[7].legend(['MPC', 'LQR'])
-
+axs[7].legend(['MPC', 'OPT'])
 
 fig.align_ylabels(axs)
 
@@ -1017,7 +956,7 @@ time = np.arange(len(tt_hor))*dt
 if visu_animation:
     
   fig = plt.figure()
-  ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1, 11), ylim=(-1, 11))
+  ax = fig.add_subplot(111, autoscale_on=False, xlim=(min(xx_ref[0,:])-1, max(xx_ref[0,:])+1), ylim=(min(uu_ref[0,:])-1, max(uu_ref)+1))
   ax.grid()
   # no labels
   ax.set_yticklabels([])
