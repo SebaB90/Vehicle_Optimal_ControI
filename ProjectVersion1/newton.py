@@ -450,7 +450,7 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
 
         stepsize = stepsize_0
 
-        if 1:
+        if 1:           # to change if you want to use costant stepsize (you also need to change stepsize_0 at the beginning)
             for ii in range(armijo_maxiters):
 
                 # temp solution update
@@ -520,7 +520,6 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
             plt.clf()
             plt.plot(steps, costs, color='g', label='$\\ell(x^k - \\gamma*d^k$)')
             plt.plot(steps, J[kk] + descent_arm[kk]*steps, color='r', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k$')
-            # plt.plot(steps, J[kk] + dJ[:,kk].T@Du[:,:,kk][:,kk]*steps + 1/2*Du[:,:,kk][:,kk].T@ddJ[:,:,kk]@Du[:,:,kk][:,kk]*steps**2, color='b', label='$\\ell(x^k) - \\gamma*\\nabla\\ell(x^k)^{\\top}d^k - \\gamma^2 d^{k\\top}\\nabla^2\\ell(x^k) d^k$')
             plt.plot(steps, J[kk] + c*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$\\ell(x^k) - \\gamma*c*\\nabla\\ell(x^k)^{\\top}d^k$')
             plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
             plt.grid()

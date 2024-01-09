@@ -134,11 +134,20 @@ def dynamics(xx, uu):
         fx[0,:] = [1, 0, 0, 0, 0, 0]
         fx[1,:] = [0, 1, 0, 0, 0, 0]
         fx[2,:] = [dt*(-xx[3,0] * cos_xx4 * sin_xx2 - xx[3,0] * sin_xx4 * cos_xx2), dt*(xx[3,0] * cos_xx4 * cos_xx2 - xx[3,0] * sin_xx4 * sin_xx2), 1, 0, 0, 0]
-        fx[3,:] = [dt*(cos_xx4 * cos_xx2 - sin_xx4 * sin_xx2), dt*(cos_xx4 * sin_xx2 + sin_xx4 * cos_xx2), 0, 1 + dt*((dFyx3[1]*sin_xx4 + dFyx3[0]*sin_xx4_minus_uu0)/mm), dt*(((dFyx3[1]*cos_xx4 + dFyx3[0]*cos_xx4_minus_uu0)*(mm * xx[3,0]) - mm*(Fy[1]*cos_xx4 + Fy[0]*cos_xx4_minus_uu0 - uu[1,0]*sin_xx4_minus_uu0))/((mm * xx[3,0])**2)), dt*(((dFyx3[0]*np.cos(uu[0,0]))*aa - dFyx3[1]*bb)/Iz)]
-        fx[4,:] = [dt*(-xx[3,0]*sin_xx4*cos_xx2 - xx[3,0]*cos_xx4*sin_xx2), dt*(-xx[3,0]*sin_xx4*sin_xx2 + xx[3,0]*cos_xx4*cos_xx2), 0, dt*((dFyx4[1]*sin_xx4 + Fy[1]*cos_xx4 - uu[1,0]*sin_xx4_minus_uu0 + dFyx4[0]*sin_xx4_minus_uu0 + Fy[0]*cos_xx4_minus_uu0)/mm), 1 + dt*((dFyx4[1]*cos_xx4 - Fy[1]*sin_xx4 + dFyx4[0]*cos_xx4_minus_uu0 - Fy[0]*sin_xx4_minus_uu0 - uu[1,0]*cos_xx4_minus_uu0)/(mm*xx[3,0])), dt*(((dFyx4[0]*np.cos(uu[0,0]))*aa - dFyx4[1]*bb)/Iz)]
-        fx[5,:] = [0, 0, dt, dt*((dFyx5[1]*sin_xx4 + dFyx5[0]*sin_xx4_minus_uu0)/mm), dt*((dFyx5[1]*cos_xx4 + dFyx5[0]*cos_xx4_minus_uu0)/(mm * xx[3,0]) - 1), 1 + dt*(((dFyx5[0]*np.cos(uu[0,0]))*aa - dFyx5[1]*bb)/Iz)]
+        fx[3,:] = [dt*(cos_xx4 * cos_xx2 - sin_xx4 * sin_xx2), dt*(cos_xx4 * sin_xx2 + sin_xx4 * cos_xx2), 0, 1 + dt*((dFyx3[1]*sin_xx4 + dFyx3[0]*sin_xx4_minus_uu0)/mm), 
+                   dt*(((dFyx3[1]*cos_xx4 + dFyx3[0]*cos_xx4_minus_uu0)*(mm * xx[3,0]) - mm*(Fy[1]*cos_xx4 + Fy[0]*cos_xx4_minus_uu0 - uu[1,0]*sin_xx4_minus_uu0))/((mm * xx[3,0])**2)), 
+                   dt*(((dFyx3[0]*np.cos(uu[0,0]))*aa - dFyx3[1]*bb)/Iz)]
+        fx[4,:] = [dt*(-xx[3,0]*sin_xx4*cos_xx2 - xx[3,0]*cos_xx4*sin_xx2), dt*(-xx[3,0]*sin_xx4*sin_xx2 + xx[3,0]*cos_xx4*cos_xx2), 0, 
+                   dt*((dFyx4[1]*sin_xx4 + Fy[1]*cos_xx4 - uu[1,0]*sin_xx4_minus_uu0 + dFyx4[0]*sin_xx4_minus_uu0 + Fy[0]*cos_xx4_minus_uu0)/mm), 
+                   1 + dt*((dFyx4[1]*cos_xx4 - Fy[1]*sin_xx4 + dFyx4[0]*cos_xx4_minus_uu0 - Fy[0]*sin_xx4_minus_uu0 - uu[1,0]*cos_xx4_minus_uu0)/(mm*xx[3,0])), 
+                   dt*(((dFyx4[0]*np.cos(uu[0,0]))*aa - dFyx4[1]*bb)/Iz)]
+        fx[5,:] = [0, 0, dt, dt*((dFyx5[1]*sin_xx4 + dFyx5[0]*sin_xx4_minus_uu0)/mm), dt*((dFyx5[1]*cos_xx4 + dFyx5[0]*cos_xx4_minus_uu0)/(mm * xx[3,0]) - 1), 
+                   1 + dt*(((dFyx5[0]*np.cos(uu[0,0]))*aa - dFyx5[1]*bb)/Iz)]
+        
         # Derivative of dynamics w.r.t. inputs (fu)
-        fu[0,:] = [0, 0, 0, dt*((dFyu0[1]*sin_xx4 + uu[1,0]*sin_xx4_minus_uu0 + dFyu0[0]*sin_xx4_minus_uu0 - Fy[0]*cos_xx4_minus_uu0)/mm), dt*((dFyu0[1]*cos_xx4 + dFyu0[0]*cos_xx4_minus_uu0 + Fy[0]*sin_xx4_minus_uu0 + uu[1,0]*cos_xx4_minus_uu0)/(mm * xx[3,0])),  dt*(((uu[1,0]*np.cos(uu[0,0]) + dFyu0[0]*np.cos(uu[0,0]) - Fy[0]*np.sin(uu[0,0]))*aa - dFyu0[1]*bb)/Iz)]
+        fu[0,:] = [0, 0, 0, dt*((dFyu0[1]*sin_xx4 + uu[1,0]*sin_xx4_minus_uu0 + dFyu0[0]*sin_xx4_minus_uu0 - Fy[0]*cos_xx4_minus_uu0)/mm), 
+                   dt*((dFyu0[1]*cos_xx4 + dFyu0[0]*cos_xx4_minus_uu0 + Fy[0]*sin_xx4_minus_uu0 + uu[1,0]*cos_xx4_minus_uu0)/(mm * xx[3,0])),  
+                   dt*(((uu[1,0]*np.cos(uu[0,0]) + dFyu0[0]*np.cos(uu[0,0]) - Fy[0]*np.sin(uu[0,0]))*aa - dFyu0[1]*bb)/Iz)]
         fu[1,:] = [0, 0, 0, dt*cos_xx4_minus_uu0/mm, dt*(- sin_xx4_minus_uu0)/(mm * xx[3,0]), dt*np.sin(uu[0,0])*aa/Iz]
         '''
         xxp[0] = xx[0,0] + dt * (xx[3,0] * np.cos(xx[4,0]) * np.cos(xx[2,0]) - xx[3,0] * np.sin(xx[4,0]) * np.sin(xx[2,0]))
@@ -166,7 +175,6 @@ def dynamics(xx, uu):
         '''
         # Removing singleton dimensions for the next state
         xxp = xxp.squeeze()
-
 
         ############################################## PENDULUM DYNAMICS ########################################################
 
