@@ -240,6 +240,7 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
             A[:,:,tt] = fx.T
             B[:,:,tt] = fu.T 
 
+        
         temp_cost = cst.termcost(xx[:,-1,kk], xx_ref[:,-1])[0]
         J[kk] += temp_cost
 
@@ -264,14 +265,14 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
         # Matrices evaluation
         for tt in range(TT):
             Qtilda[:,:,tt], Rtilda[:,:,tt], Stilda[:,:,tt] = cst.stagecost(xx[:,tt,kk], uu[:,tt,kk], xx_ref[:,tt], uu_ref[:,tt])[3:]
-        d1lT, QTilda = cst.termcost(xx[:,-1,kk], xx_ref[:,-1])[1:3]
         
+        d1lT, QTilda = cst.termcost(xx[:,-1,kk], xx_ref[:,-1])[1:3]
         Dx[:,:,kk], Du[:,:,kk], KK, sigma = ltv_LQR(A, B, Qtilda, Rtilda, Stilda, QTilda, TT, xx0, d1l, d2l, d1lT.squeeze(), cc)
 
 
         for tt in reversed(range(TT)): 
-            descent[kk] += sigma[:,tt].T@sigma[:,tt] 
-            descent_arm[kk] += dJ[:,tt,kk].T@sigma[:,tt] 
+            descent[kk] += Du[:,tt,kk].T@Du[:,tt,kk] 
+            descent_arm[kk] += dJ[:,tt,kk].T@Du[:,tt,kk] 
 
         # Stepsize selection - ARMIJO
         stepsizes = []  # list of stepsizes
@@ -286,7 +287,6 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
 
                 xx_temp = np.zeros((ns,TT))
                 uu_temp = np.zeros((ni,TT))
-                descent_arm[kk] = 0
 
                 xx_temp[:,0] = x0
 

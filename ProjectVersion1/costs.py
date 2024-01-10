@@ -19,8 +19,8 @@ if ns == 2:
     QQT = QQt   # Terminal cost matrix
 
 if ns == 6:
-    QQt = np.diag([1.0, 1.0, 10.0, 100.0, 100.0, 10.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
-    RRt = np.diag([1000.0, 0.00001])    # co0sts for uu = [Delta,F]
+    QQt = 0.1*np.diag([1.0, 1.0, 1000.0, 10000.0, 1000.0, 1000.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
+    RRt = 0.1*np.diag([1000.0, 0.0001])    # co0sts for uu = [Delta,F]
     QQT = QQt   # Terminal cost matrix
     
 #######################################

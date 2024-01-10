@@ -64,7 +64,7 @@ xx_real_opt[:,0] = xx0.squeeze()
 
 for tt in range(Tsim-1):
 
-    if tt%5 == 0: # print every 5 time instants
+    if tt%50 == 0: # print every 5 time instants
       print('LQR:\t t = {}'.format(tt))
 
     # System evolution - real with optimal control input (open-loop)
