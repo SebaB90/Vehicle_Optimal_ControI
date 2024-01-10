@@ -853,17 +853,15 @@ if Task4 == True & Task2 == True:
     constr = []
     # Tsim-1-T_pred
     for tt in range(tl, tl + T_pred -1):
-      cost += cp.quad_form(xx_mpc[:,tt-tl], QQ) + cp.quad_form(uu_mpc[:,tt-tl], RR)
-      constr += [xx_mpc[:,tt+1-tl] == AA[:,:,tl]@xx_mpc[:,tt-tl] + BB[:,:,tl]@uu_mpc[:,tt-tl],  # dynamics constraint
+      cost += cp.quad_form(xx_mpc[:,tt-tl] - xx_star[:,tt], QQ) + cp.quad_form(uu_mpc[:,tt-tl] - uu_star[:,tt], RR)
+      constr += [xx_mpc[:,tt+1-tl] == AA[:,:,tt]@xx_mpc[:,tt-tl] + BB[:,:,tt]@uu_mpc[:,tt-tl],  # dynamics constraint
               # other max values contrant
-              #uu_mpc[1,tt-tl] >= umin,
-              #uu_mpc[1,tt-tl] <= umax,
-              #xx_mpc[4,tt-tl] >= xmin,
-              #xx_mpc[4,tt-tl] <= xmax,
+              uu_mpc[1,tt-tl] <= umax,
+              xx_mpc[4,tt-tl] >= xmin,
               ]
 
     # sums problem objectives and concatenates constraints.
-    cost += cp.quad_form(xx_mpc[:,T_pred-1], QQf)
+    cost += cp.quad_form(xx_mpc[:,T_pred-1] - xx_star[:,tl+T_pred-1], QQf)
     constr += [xx_mpc[:,0] == xxt]
 
     problem = cp.Problem(cp.Minimize(cost), constr)
@@ -879,12 +877,9 @@ if Task4 == True & Task2 == True:
   # Model Predictive Control
   #############################
 
-  T_pred = int(TT/10)      # MPC Prediction horizon
-  u1max = 100000
-  u1min = -u1max
-
-  x4max = 30
-  x4min = -x4max
+  T_pred = int(TT/5)      # MPC Prediction horizon
+  u1max = 1100
+  x4min = -0.015
 
   xx_real_mpc = np.zeros((ns,Tsim))
   uu_real_mpc = np.zeros((ni,Tsim))
@@ -894,7 +889,7 @@ if Task4 == True & Task2 == True:
   xx_real_mpc[:,0] = xx_star[:,0]
   uu_real_mpc[:,0] = uu_star[:,0]
 
-  for tt in range(Tsim-1-T_pred):
+  for tt in range(Tsim-T_pred-1):
     # System evolution - real with MPC
 
     xx_t_mpc = xx_real_mpc[:,tt] # get initial condition
@@ -906,10 +901,10 @@ if Task4 == True & Task2 == True:
       print('MPC:\t t = {:.1f} sec.'.format(tt*dt))
     
     QQt = np.diag([1, 1, 100.0, 1.0, 100, 100])   # cost for xx = [x,y,psi,V,Beta,psidot]
-    RRt = np.diag([100, 1.0])    # co0sts for uu = [Delta,F]
+    RRt = np.diag([1000, 1.0])    # co0sts for uu = [Delta,F]
     QQT = QQt  # Terminal cost matrix
     
-    uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, cst.QQt, cst.RRt, tt, cst.QQT, xx_t_mpc, umax=u1max, umin=u1min, xmax=x4max, xmin=x4min, T_pred = T_pred)[:2]
+    uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, QQt, RRt, tt, QQT, xx_t_mpc, umax=u1max, xmin=x4min, T_pred = T_pred)[:2]
     
     xx_real_mpc[:,tt+1] = dyn.dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
 
@@ -917,83 +912,81 @@ if Task4 == True & Task2 == True:
   # Plots
   #######################################
 
-  time = np.arange(Tsim)
+  time = np.arange(Tsim-T_pred)
 
   fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-  axs[0].plot(time, xx_real_mpc[0,:], linewidth=2)
-  axs[0].plot(time, xx_star[0,:],'--r', linewidth=2)
+  axs[0].plot(time, xx_real_mpc[0,:Tsim-T_pred],'m', linewidth=2)
+  axs[0].plot(time, xx_star[0,:Tsim-T_pred],'--g', linewidth=2)
   axs[0].grid()
   axs[0].set_ylabel('$x$')
-  axs[0].set_xlim([-1,Tsim])
+  axs[0].set_xlim([-1,Tsim-T_pred])
   axs[0].legend(['MPC', 'OPT'])
 
   #####
-  axs[1].plot(time, xx_real_mpc[1,:], linewidth=2)
-  axs[1].plot(time, xx_star[1,:], '--r', linewidth=2)
+  axs[1].plot(time, xx_real_mpc[1,:Tsim-T_pred],'m', linewidth=2)
+  axs[1].plot(time, xx_star[1,:Tsim-T_pred], '--g', linewidth=2)
   axs[1].grid()
   axs[1].set_ylabel('$y$')
-  axs[1].set_xlim([-1,Tsim])
+  axs[1].set_xlim([-1,Tsim-T_pred])
   axs[1].legend(['MPC', 'OPT'])
 
   #####
-  axs[2].plot(time, xx_real_mpc[2,:], linewidth=2)
-  axs[2].plot(time, xx_star[2,:], '--r', linewidth=2)
+  axs[2].plot(time, xx_real_mpc[2,:Tsim-T_pred],'m', linewidth=2)
+  axs[2].plot(time, xx_star[2,:Tsim-T_pred], '--g', linewidth=2)
   axs[2].grid()
   axs[2].set_ylabel('$psi$')
-  axs[2].set_xlim([-1,Tsim])
+  axs[2].set_xlim([-1,Tsim-T_pred])
   axs[2].legend(['MPC', 'OPT'])
 
   #####
-  axs[3].plot(time, xx_real_mpc[3,:], linewidth=2)
-  axs[3].plot(time, xx_star[3,:], '--r', linewidth=2)
+  axs[3].plot(time, xx_real_mpc[3,:Tsim-T_pred],'m', linewidth=2)
+  axs[3].plot(time, xx_star[3,:Tsim-T_pred], '--g', linewidth=2)
   axs[3].grid()
   axs[3].set_ylabel('$V$')
-  axs[3].set_xlim([-1,Tsim])
+  axs[3].set_xlim([-1,Tsim-T_pred])
   axs[3].legend(['MPC', 'OPT'])
 
   #####
-  axs[4].plot(time, xx_real_mpc[4,:], linewidth=2)
-  axs[4].plot(time, xx_star[4,:], '--r', linewidth=2)
+  axs[4].plot(time, xx_real_mpc[4,:Tsim-T_pred],'m', linewidth=2)
+  axs[4].plot(time, xx_star[4,:Tsim-T_pred], '--g', linewidth=2)
   
-  if x4max < 1.1*np.amax(xx_real_mpc[4,:]): # draw constraints only if active
-    axs[4].plot(time, np.ones(Tsim)*x4max, '--g', linewidth=1)
-    axs[1].plot(time, np.ones(Tsim)*x4min, '--g', linewidth=1)
+  if x4max < 1.1*np.amax(xx_real_mpc[4,:Tsim-T_pred]): # draw constraints only if active
+    axs[4].plot(time, np.ones(Tsim-T_pred)*x4min, '--r', linewidth=1)
     
   axs[4].grid()
   axs[4].set_ylabel('$beta$')
-  axs[4].set_xlim([-1,Tsim])
+  axs[4].set_xlim([-1,Tsim-T_pred])
   axs[4].legend(['MPC', 'OPT'])
 
   #####
-  axs[5].plot(time, xx_real_mpc[5,:], linewidth=2)
-  axs[5].plot(time, xx_star[5,:], '--r', linewidth=2)
+  axs[5].plot(time, xx_real_mpc[5,:Tsim-T_pred],'m', linewidth=2)
+  axs[5].plot(time, xx_star[5,:Tsim-T_pred], '--g', linewidth=2)
   axs[5].grid()
   axs[5].set_ylabel('$psi dot$')
-  axs[5].set_xlim([-1,Tsim])
+  axs[5].set_xlim([-1,Tsim-T_pred])
   axs[5].legend(['MPC', 'OPT'])
 
   #####
-  axs[6].plot(time, uu_real_mpc[0,:],'g', linewidth=2)
-  axs[6].plot(time, uu_star[0,:],'--r', linewidth=2)
+  axs[6].plot(time, uu_real_mpc[0,:Tsim-T_pred],'m', linewidth=2)
+  axs[6].plot(time, uu_star[0,:Tsim-T_pred],'--g', linewidth=2)
   axs[6].grid()
   axs[6].set_ylabel('$delta$')
   axs[6].set_xlabel('time')
-  axs[6].set_xlim([-1,Tsim])
+  axs[6].set_xlim([-1,Tsim-T_pred])
   axs[6].legend(['MPC', 'OPT'])
 
   #####
-  axs[7].plot(time, uu_real_mpc[1,:],'g', linewidth=2)
-  axs[7].plot(time, uu_star[1,:],'--r', linewidth=2)
+  axs[7].plot(time, uu_real_mpc[1,:Tsim-T_pred],'m', linewidth=2)
+  axs[7].plot(time, uu_star[1,:Tsim-T_pred],'--g', linewidth=2)
   
-  if u1max < 1.1*np.amax(uu_real_mpc[1,:]): # draw constraints only if active
-    axs[7].plot(time, np.ones(Tsim)*u1max, '--g', linewidth=1)
-    axs[7].plot(time, np.ones(Tsim)*u1min, '--g', linewidth=1)
+  if u1max < 1.1*np.amax(uu_real_mpc[1,:Tsim-T_pred]): # draw constraints only if active
+    axs[7].plot(time, np.ones(Tsim-T_pred)*u1max, '--r', linewidth=1)
     
   axs[7].grid()
   axs[7].set_ylabel('$F$')
   axs[7].set_xlabel('time')
-  axs[7].set_xlim([-1,Tsim])
+  axs[7].set_xlim([-1,Tsim-T_pred])
   axs[7].legend(['MPC', 'OPT'])
 
   fig.align_ylabels(axs)
