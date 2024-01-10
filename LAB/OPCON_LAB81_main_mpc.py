@@ -103,13 +103,11 @@ for tt in range(Tsim-1):
 
     uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(AAnom, BBnom, QQ,RR, QQf, xx_t_mpc, umax=umax, umin=umin, x2_min = x2min, x2_max = x2max, T_pred = T_pred)[:2]
     
-
     xx_real_mpc[:,tt+1] = real_dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
 
 #######################################
 # Plots
 #######################################
-
 
 time = np.arange(Tsim)
 

@@ -8,8 +8,8 @@ from sympy import symbols, diff
 import numpy as np
 vehicle_dyn = True          # change to switch between bicycle or pendulum dynamics
 
-dt = 1e-3        # discretization stepsize - Forward Euler
-tf = 10          # Final time in seconds
+dt = 1e-2        # discretization stepsize - Forward Euler
+tf = 5          # Final time in seconds
 TT = int(tf/dt)  # Number of discrete-time samples
 TT_mid = TT/2
 

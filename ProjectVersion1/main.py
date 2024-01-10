@@ -24,8 +24,21 @@ import Gradient as grad
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-test = False # Set true for testing the open loop dynamics and the correctness of the derivatives
-visu_animation = True
+
+############################################################
+# Simulation parameters
+############################################################
+
+test = False  # Set true for testing the open loop dynamics and the correctness of the derivatives
+max_iters = 5  # Choose the maximum number of iteration for the Newton's method
+# Set to true the task that you want to simulate
+Task1 = False  # Newton's method on a first try reference trajectory
+Task2 = True  # Newton's method with smoothed trajectory
+Task3 = True  # Trajectory tracking via LQR, task 2 must be set to true
+Task4 = True  # MPC, Task2 must be set to true
+Task5 = True  # Animation
+
+
 
 #######################################################################
 ###################### TASK 0: DISCRETIZATION #########################
@@ -43,8 +56,6 @@ ni = dyn.ni  # Get the number of input from the dynamics
 
 TT = dyn.TT  # Number of discrete-time samples
 TT_mid = dyn.TT_mid
-
-max_iters = 15
 
 ############################################################
 # TESTS
@@ -148,9 +159,15 @@ if test == True and ns==6:
     print(f'\nError in derivatives of u is:\n{check_u}\n')
 
 
+
 ########################################################################
 ############## TASK 1: TRAJECTORY GENERATION (I) #######################
 ########################################################################
+
+print('\n\n\n')
+print('#################################################################')
+purple_bold_title = "\033[1;35m\nTASK 1: TRAJECTORY GENERATION (I)\033[0m"
+print(purple_bold_title) 
 
 if ns == 6:
     
@@ -219,13 +236,12 @@ if ns == 6:
   uu_eq = eq[ns:,:]
 
   # Print the result
-  print("\n\n")
   blue_bold_title = "\033[1;34mEVALUATED EQUILIBRIUM:\033[0m"
   print(blue_bold_title)
-  print(f" \nxx at Equilibrium 1:\n  {xx_eq[0:, 0]}")
-  print(f" \nuu at Equilibrium 1:\n  {uu_eq[0:, 0]}")
-  print(f" \nxx at Equilibrium 2:\n  {xx_eq[0:, 1]}")
-  print(f" \nuu at Equilibrium 2:\n  {uu_eq[0:, 1]}\n\n")
+  print(f" xx at Equilibrium 1:\n  {xx_eq[0:, 0]}")
+  print(f" uu at Equilibrium 1:\n  {uu_eq[0:, 0]}")
+  print(f" xx at Equilibrium 2:\n  {xx_eq[0:, 1]}")
+  print(f" uu at Equilibrium 2:\n  {uu_eq[0:, 1]}")
   
   
   ############################################################
@@ -266,45 +282,44 @@ if ns == 6:
 
   fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-  axs[0].plot(tt_hor, traj_ref[0,:], 'g--', linewidth=2)
+  axs[0].plot(tt_hor, traj_ref[0,:], 'r--', linewidth=2)
   axs[0].grid()
   axs[0].set_ylabel('$x$')
 
-  axs[1].plot(tt_hor, traj_ref[1,:], 'g--', linewidth=2)
+  axs[1].plot(tt_hor, traj_ref[1,:], 'r--', linewidth=2)
   axs[1].grid()
   axs[1].set_ylabel('$y$')
 
-  axs[2].plot(tt_hor, traj_ref[2,:], 'g--', linewidth=2)
+  axs[2].plot(tt_hor, traj_ref[2,:], 'r--', linewidth=2)
   axs[2].grid()
   axs[2].set_ylabel('$psi$')
 
-  axs[3].plot(tt_hor, traj_ref[3,:], 'g--', linewidth=2)
+  axs[3].plot(tt_hor, traj_ref[3,:], 'r--', linewidth=2)
   axs[3].grid()
   axs[3].set_ylabel('$V$')
 
-  axs[4].plot(tt_hor, traj_ref[4,:], 'g--', linewidth=2)
+  axs[4].plot(tt_hor, traj_ref[4,:], 'r--', linewidth=2)
   axs[4].grid()
   axs[4].set_ylabel('$beta$')
 
-  axs[5].plot(tt_hor, traj_ref[5,:], 'g--', linewidth=2)
+  axs[5].plot(tt_hor, traj_ref[5,:], 'r--', linewidth=2)
   axs[5].grid()
   axs[5].set_ylabel('$psi dot$')
 
-  axs[6].plot(tt_hor, traj_ref[6,:], 'g--', linewidth=2)
+  axs[6].plot(tt_hor, traj_ref[6,:], 'r--', linewidth=2)
   axs[6].grid()
   axs[6].set_ylabel('$u_0$')
 
-  axs[7].plot(tt_hor, traj_ref[7,:], 'g--', linewidth=2)
+  axs[7].plot(tt_hor, traj_ref[7,:], 'r--', linewidth=2)
   axs[7].grid()
   axs[7].set_ylabel('$u_1$')
   axs[7].set_xlabel('time')
 
-  fig.suptitle("Reference", fontsize=16)
+  fig.suptitle("Reference")
   fig.align_ylabels(axs)
 
   plt.show()
-    
-    
+        
 
 if ns == 2:
   ######################################
@@ -328,11 +343,11 @@ if ns == 2:
 
   fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-  axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
+  axs[0].plot(tt_hor, xx_ref[0,:], 'r--', linewidth=2)
   axs[0].grid()
   axs[0].set_ylabel('$x_1$')
 
-  axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
+  axs[1].plot(tt_hor, xx_ref[1,:], 'r--', linewidth=2)
   axs[1].grid()
   axs[1].set_ylabel('$x_2$')
 
@@ -348,615 +363,648 @@ if ns == 2:
 # NEWTON'S METHOD evaluation  
 ####################################################################
 
-xx = np.zeros((ns, TT, max_iters+1))   # state seq.
-uu = np.zeros((ni, TT, max_iters+1))   # input seq.
+if Task1 == True:
+  
+  blue_bold_title = "\033[1;34mNEWTON'S METHOD EVALUATION:\033[0m"
+  print(blue_bold_title)
+  
+  xx = np.zeros((ns, TT, max_iters+1))   # state seq.
+  uu = np.zeros((ni, TT, max_iters+1))   # input seq.
 
-# initial conditions
-if ns == 6:
-  for tt in range(TT):
-    xx[:,tt,0] = np.copy(xx_ref[:,0])
-    uu[:,tt,0] = np.copy(uu_ref[:,0]) 
+  # initial conditions
+  if ns == 6:
+    for tt in range(TT):
+      xx[:,tt,0] = np.copy(xx_ref[:,0])
+      uu[:,tt,0] = np.copy(uu_ref[:,0]) 
 
-x0 = np.copy(xx_ref[:,0])
-# xx, uu, descent, JJ, kk = grad.Gradient(xx, uu, xx_ref, uu_ref, cst.QQt, cst.RRt, cst.QQT, max_iters)
-xx, uu, descent, JJ, kk = nwtn.Newton(xx, uu, xx_ref, uu_ref, x0, max_iters)
+  x0 = np.copy(xx_ref[:,0])
+  # xx, uu, descent, JJ, kk = grad.Gradient(xx, uu, xx_ref, uu_ref, cst.QQt, cst.RRt, cst.QQT, max_iters)
+  xx, uu, descent, JJ, kk = nwtn.Newton(xx, uu, xx_ref, uu_ref, x0, max_iters)
 
-xx_star = xx[:,:,kk]
-uu_star = uu[:,:,kk]
-uu_star[:,-1] = uu_star[:,-3]        # for plotting purposes
+  xx_star = xx[:,:,kk]
+  uu_star = uu[:,:,kk]
+  uu_star[:,-1] = uu_star[:,-3]        # for plotting purposes
 
-# Plots
+  # Plots
 
-plt.figure('descent direction')
-plt.plot(np.arange(kk), descent[:kk])
-plt.xlabel('$k$')
-plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
-plt.yscale('log')
-plt.grid()
-plt.show(block=False)
+  plt.figure('descent direction')
+  plt.plot(np.arange(kk), descent[:kk])
+  plt.xlabel('$k$')
+  plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
+  plt.yscale('log')
+  plt.grid()
+  plt.show(block=False)
 
-plt.figure('cost')
-plt.plot(np.arange(kk), JJ[:kk])
-plt.xlabel('$k$')
-plt.ylabel('$J(\\mathbf{u}^k)$')
-plt.yscale('log')
-plt.grid()
-plt.show(block=False)
+  plt.figure('cost')
+  plt.plot(np.arange(kk), JJ[:kk])
+  plt.xlabel('$k$')
+  plt.ylabel('$J(\\mathbf{u}^k)$')
+  plt.yscale('log')
+  plt.grid()
+  plt.show(block=False)
 
-##############################################################
-# Design OPTIMAL TRAJECTORY  
-##############################################################
+  ##############################################################
+  # Design OPTIMAL TRAJECTORY  
+  ##############################################################
 
-fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+  fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-if ns == 6:
-  axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
-  axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
-  axs[0].grid()
-  axs[0].set_ylabel('$x$')
+  if ns == 6:
+    axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
+    axs[0].plot(tt_hor, xx_ref[0,:], 'r--', linewidth=2)
+    axs[0].grid()
+    axs[0].set_ylabel('$x$')
 
-  axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
-  axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
-  axs[1].grid()
-  axs[1].set_ylabel('$y$')
+    axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
+    axs[1].plot(tt_hor, xx_ref[1,:], 'r--', linewidth=2)
+    axs[1].grid()
+    axs[1].set_ylabel('$y$')
 
-  axs[2].plot(tt_hor, xx_star[2,:], linewidth=2)
-  axs[2].plot(tt_hor, xx_ref[2,:], 'g--', linewidth=2)
-  axs[2].grid()
-  axs[2].set_ylabel('$psi$')
+    axs[2].plot(tt_hor, xx_star[2,:], linewidth=2)
+    axs[2].plot(tt_hor, xx_ref[2,:], 'r--', linewidth=2)
+    axs[2].grid()
+    axs[2].set_ylabel('$psi$')
 
-  axs[3].plot(tt_hor, xx_star[3,:], linewidth=2)
-  axs[3].plot(tt_hor, xx_ref[3,:], 'g--', linewidth=2)
-  axs[3].grid()
-  axs[3].set_ylabel('$V$')
+    axs[3].plot(tt_hor, xx_star[3,:], linewidth=2)
+    axs[3].plot(tt_hor, xx_ref[3,:], 'r--', linewidth=2)
+    axs[3].grid()
+    axs[3].set_ylabel('$V$')
 
-  axs[4].plot(tt_hor, xx_star[4,:], linewidth=2)
-  axs[4].plot(tt_hor, xx_ref[4,:], 'g--', linewidth=2)
-  axs[4].grid()
-  axs[4].set_ylabel('$beta$')
+    axs[4].plot(tt_hor, xx_star[4,:], linewidth=2)
+    axs[4].plot(tt_hor, xx_ref[4,:], 'r--', linewidth=2)
+    axs[4].grid()
+    axs[4].set_ylabel('$beta$')
 
-  axs[5].plot(tt_hor, xx_star[5,:], linewidth=2)
-  axs[5].plot(tt_hor, xx_ref[5,:], 'g--', linewidth=2)
-  axs[5].grid()
-  axs[5].set_ylabel('$psi dot$')
+    axs[5].plot(tt_hor, xx_star[5,:], linewidth=2)
+    axs[5].plot(tt_hor, xx_ref[5,:], 'r--', linewidth=2)
+    axs[5].grid()
+    axs[5].set_ylabel('$psi dot$')
 
-  axs[6].plot(tt_hor, uu_star[0,:],'r', linewidth=2)
-  axs[6].plot(tt_hor, uu_ref[0,:], 'g--', linewidth=2)
-  axs[6].grid()
-  axs[6].set_ylabel('$delta$')
+    axs[6].plot(tt_hor, uu_star[0,:],'g', linewidth=2)
+    axs[6].plot(tt_hor, uu_ref[0,:], 'r--', linewidth=2)
+    axs[6].grid()
+    axs[6].set_ylabel('$delta$')
 
-  axs[7].plot(tt_hor, uu_star[1,:],'r', linewidth=2)
-  axs[7].plot(tt_hor, uu_ref[1,:], 'g--', linewidth=2)
-  axs[7].grid()
-  axs[7].set_ylabel('$F$')
-  axs[7].set_xlabel('time')
+    axs[7].plot(tt_hor, uu_star[1,:],'g', linewidth=2)
+    axs[7].plot(tt_hor, uu_ref[1,:], 'r--', linewidth=2)
+    axs[7].grid()
+    axs[7].set_ylabel('$F$')
+    axs[7].set_xlabel('time')
 
-if ns == 2:
-  axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
-  axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
-  axs[0].grid()
-  axs[0].set_ylabel('$x_1$')
+  if ns == 2:
+    axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
+    axs[0].plot(tt_hor, xx_ref[0,:], 'r--', linewidth=2)
+    axs[0].grid()
+    axs[0].set_ylabel('$x_1$')
 
-  axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
-  axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
-  axs[1].grid()
-  axs[1].set_ylabel('$x_2$')
+    axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
+    axs[1].plot(tt_hor, xx_ref[1,:], 'r--', linewidth=2)
+    axs[1].grid()
+    axs[1].set_ylabel('$x_2$')
 
-  axs[2].plot(tt_hor, uu_star[0,:],'r', linewidth=2)
-  axs[2].plot(tt_hor, uu_ref[0,:], 'r--', linewidth=2)
-  axs[2].grid()
-  axs[2].set_ylabel('$u$')
-  axs[2].set_xlabel('time')
-    
-plt.show()
+    axs[2].plot(tt_hor, uu_star[0,:],'r', linewidth=2)
+    axs[2].plot(tt_hor, uu_ref[0,:], 'r--', linewidth=2)
+    axs[2].grid()
+    axs[2].set_ylabel('$u$')
+    axs[2].set_xlabel('time')
+      
+  plt.show()
 
-# Plotting the trajectory
-plt.plot(xx_star[0,:], xx_star[1,:], label='Optimal Trajectory')
-plt.plot(xx_ref[0,:], xx_ref[1,:],'r--', label='Reference Trajectory')
-plt.title('Vehicle Trajectory')
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.legend()
-plt.grid(True)
-plt.show()
+  # Plotting the trajectory
+  plt.plot(xx_star[0,:], xx_star[1,:], label='Optimal Trajectory')
+  plt.plot(xx_ref[0,:], xx_ref[1,:],'r--', label='Reference Trajectory')
+  plt.title('Vehicle Trajectory')
+  plt.xlabel('X-axis')
+  plt.ylabel('Y-axis')
+  plt.legend()
+  plt.grid(True)
+  plt.show()
 
-# stop the simulation for the pendulum
-if ns == 2:
-  print("\n\n")
-  purple_bold_title = "\033[1;35mPENDULUM EVALUATION TERMINATED\033[0m"
-  print(purple_bold_title) 
-  print("\n\n")
-  sys.exit()
+  # stop the simulation for the pendulum
+  if ns == 2:
+    print("\n\n")
+    purple_bold_title = "\033[1;35mPENDULUM EVALUATION TERMINATED\033[0m"
+    print(purple_bold_title) 
+    print("\n\n")
+    sys.exit()
+
+
 
 ########################################################################
 ############## TASK 2: TRAJECTORY GENERATION (II) ######################
 ########################################################################
 
-############################################################
-# SMOOTHING the reference trajectory
-############################################################
+if Task2 == True:
+  
+  purple_bold_title = "\033[1;35m\nTASK 2: TRAJECTORY GENERATION (II)\033[0m"
+  print(purple_bold_title) 
+  ############################################################
+  # SMOOTHING the reference trajectory
+  ############################################################
 
-# Perform linear interpolation for reference trajectory
-fig, axs = plt.subplots(ns+ni, 1, sharex='all')
-fig.suptitle('Trajectory Smoothing using PCHIP Spline')
-traj_smooth = np.zeros((ns+ni,TT))
-x_traj_smooth = np.zeros((ns+ni,TT))
+  # Perform linear interpolation for reference trajectory
+  fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+  fig.suptitle('Trajectory Smoothing using PCHIP Spline')
+  traj_smooth = np.zeros((ns+ni,TT))
+  x_traj_smooth = np.zeros((ns+ni,TT))
 
-axs[0].plot(tt_hor, traj_ref[0, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-axs[0].grid()
-axs[1].plot(tt_hor, traj_ref[1, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-axs[1].grid()
-axs[2].plot(tt_hor, traj_ref[2, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-axs[2].grid()
+  axs[0].plot(tt_hor, traj_ref[0, :], 'r--', linewidth=2, label='Original Reference Trajectory')
+  axs[0].grid()
+  axs[1].plot(tt_hor, traj_ref[1, :], 'r--', linewidth=2, label='Original Reference Trajectory')
+  axs[1].grid()
+  axs[2].plot(tt_hor, traj_ref[2, :], 'r--', linewidth=2, label='Original Reference Trajectory')
+  axs[2].grid()
 
-traj_smooth[:3,:] = traj_ref[:3,:]
+  traj_smooth[:3,:] = traj_ref[:3,:]
 
-for i in range (3,ns+ni):
-  new_num_points = 7      # Adjust the number of points for a smoother curve
-  interp_indices = np.linspace(0, tf, new_num_points)
-  new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
+  for i in range (3,ns+ni):
+    new_num_points = 7      # Adjust the number of points for a smoother curve
+    interp_indices = np.linspace(0, tf, new_num_points)
+    new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
 
-  # define point to create spline
-  x_spl = np.array([interp_indices[0], interp_indices[1], interp_indices[2], interp_indices[4], interp_indices[5], interp_indices[6]])
-  y_spl = np.array([new_traj_ref_0[0], new_traj_ref_0[1], new_traj_ref_0[2], new_traj_ref_0[4], new_traj_ref_0[5], new_traj_ref_0[6]])
+    # define point to create spline
+    x_spl = np.array([interp_indices[0], interp_indices[1], interp_indices[2], interp_indices[4], interp_indices[5], interp_indices[6]])
+    y_spl = np.array([new_traj_ref_0[0], new_traj_ref_0[1], new_traj_ref_0[2], new_traj_ref_0[4], new_traj_ref_0[5], new_traj_ref_0[6]])
 
-  # Create a piecewise cubic Hermite interpolating polynomial(PCHIP) interpolation of the given points
-  cs = PchipInterpolator(x_spl, y_spl)
+    # Create a piecewise cubic Hermite interpolating polynomial(PCHIP) interpolation of the given points
+    cs = PchipInterpolator(x_spl, y_spl)
 
-  # Generate new, smoother x values (denser for plotting)
-  x_spl_new = np.linspace(min(x_spl), max(x_spl), TT)
+    # Generate new, smoother x values (denser for plotting)
+    x_spl_new = np.linspace(min(x_spl), max(x_spl), TT)
 
-  # Compute the smoothed y values
-  y_spl_new = cs(x_spl_new)
+    # Compute the smoothed y values
+    y_spl_new = cs(x_spl_new)
 
-  # Store the values inside an array
-  traj_smooth[i,:] = y_spl_new
+    # Store the values inside an array
+    traj_smooth[i,:] = y_spl_new
 
-  # Plotting the original and smoothed trajectories
-  axs[i].plot(tt_hor, traj_ref[i, :], 'g--', linewidth=2, label='Original Reference Trajectory')
-  axs[i].plot(interp_indices, new_traj_ref_0, 'b--', linewidth=2, label='Interpolated Trajectory')
-  axs[i].plot(x_spl, y_spl, 'o', label='Points used for spline creation')
-  axs[i].plot(x_spl_new, y_spl_new, 'r-', label='Smoothed Trajectory')
-  axs[i].grid()
-  if i == ns+ni:
-    axs[i].xlabel('time')
+    # Plotting the original and smoothed trajectories
+    axs[i].plot(tt_hor, traj_ref[i, :], 'r--', linewidth=2, label='Original Reference Trajectory')
+    axs[i].plot(interp_indices, new_traj_ref_0, 'g--', linewidth=2, label='Interpolated Trajectory')
+    axs[i].plot(x_spl, y_spl, 'o', label='Points used for spline creation')
+    axs[i].plot(x_spl_new, y_spl_new, 'b-', label='Smoothed Trajectory')
+    axs[i].grid()
+    if i == ns+ni:
+      axs[i].xlabel('time')
 
-axs[0].set_ylabel('$x$')
-axs[1].set_ylabel('$y$')
-axs[2].set_ylabel('$psi$')
-axs[3].set_ylabel('$V$')
-axs[4].set_ylabel('$beta$')
-axs[5].set_ylabel('$psi dot$')
-axs[6].set_ylabel('$delta$')
-axs[7].set_ylabel('$F$')
-plt.legend()
-plt.show()
+  axs[0].set_ylabel('$x$')
+  axs[1].set_ylabel('$y$')
+  axs[2].set_ylabel('$psi$')
+  axs[3].set_ylabel('$V$')
+  axs[4].set_ylabel('$beta$')
+  axs[5].set_ylabel('$psi dot$')
+  axs[6].set_ylabel('$delta$')
+  axs[7].set_ylabel('$F$')
+  plt.legend()
+  plt.show()
 
 
-#####################################################################
-# NEWTON'S METHOD evaluation  
-#####################################################################
+  #####################################################################
+  # NEWTON'S METHOD evaluation  
+  #####################################################################
+  
+  blue_bold_title = "\033[1;34mNEWTON'S METHOD EVALUATION:\033[0m"
+  print(blue_bold_title)
+  
+  # arrays to store data
+  xx = np.zeros((ns, TT, max_iters+1))   # state seq.
+  uu = np.zeros((ni, TT, max_iters+1))   # input seq.
 
-# arrays to store data
-xx = np.zeros((ns, TT, max_iters+1))   # state seq.
-uu = np.zeros((ni, TT, max_iters+1))   # input seq.
+  xx_ref = traj_smooth[0:6,:]
+  uu_ref = traj_smooth[6:,:]
 
-xx_ref = traj_smooth[0:6,:]
-uu_ref = traj_smooth[6:,:]
+  # initial conditions
+  if ns == 6:
+    for tt in range(TT):
+      xx[:,tt,0] = np.copy(xx_ref[:,0]) 
+      uu[:,tt,0] = np.copy(uu_ref[:,0])
 
-# initial conditions
-if ns == 6:
-  for tt in range(TT):
-    xx[:,tt,0] = np.copy(xx_ref[:,0]) 
-    uu[:,tt,0] = np.copy(uu_ref[:,0])
+  x0 = np.copy(xx_ref[:,0])
 
-x0 = np.copy(xx_ref[:,0])
+  xx, uu, descent, JJ, kk = nwtn.Newton(xx, uu, xx_ref, uu_ref, x0, max_iters)
 
-xx, uu, descent, JJ, kk = nwtn.Newton(xx, uu, xx_ref, uu_ref, x0, max_iters)
+  xx_star = xx[:,:,kk-1]
+  uu_star = uu[:,:,kk-1]
+  uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
 
-xx_star = xx[:,:,kk-1]
-uu_star = uu[:,:,kk-1]
-uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
+  # Plots
 
-# Plots
+  plt.figure('descent direction')
+  plt.plot(np.arange(kk), descent[:kk])
+  plt.xlabel('$k$')
+  plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
+  plt.yscale('log')
+  plt.grid()
+  plt.show(block=False)
 
-plt.figure('descent direction')
-plt.plot(np.arange(kk), descent[:kk])
-plt.xlabel('$k$')
-plt.ylabel('||$\\nabla J(\\mathbf{u}^k)||$')
-plt.yscale('log')
-plt.grid()
-plt.show(block=False)
+  plt.figure('cost')
+  plt.plot(np.arange(kk), JJ[:kk])
+  plt.xlabel('$k$')
+  plt.ylabel('$J(\\mathbf{u}^k)$')
+  plt.yscale('log')
+  plt.grid()
+  plt.show(block=False)
 
-plt.figure('cost')
-plt.plot(np.arange(kk), JJ[:kk])
-plt.xlabel('$k$')
-plt.ylabel('$J(\\mathbf{u}^k)$')
-plt.yscale('log')
-plt.grid()
-plt.show(block=False)
+  ##############################################################
+  # Design OPTIMAL TRAJECTORY  
+  ##############################################################
 
-##############################################################
-# Design OPTIMAL TRAJECTORY  
-##############################################################
+  fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+  axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
+  axs[0].plot(tt_hor, xx_ref[0,:], 'r--', linewidth=2)
+  axs[0].grid()
+  axs[0].set_ylabel('$x$')
 
-axs[0].plot(tt_hor, xx_star[0,:], linewidth=2)
-axs[0].plot(tt_hor, xx_ref[0,:], 'g--', linewidth=2)
-axs[0].grid()
-axs[0].set_ylabel('$x$')
+  axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
+  axs[1].plot(tt_hor, xx_ref[1,:], 'r--', linewidth=2)
+  axs[1].grid()
+  axs[1].set_ylabel('$y$')
 
-axs[1].plot(tt_hor, xx_star[1,:], linewidth=2)
-axs[1].plot(tt_hor, xx_ref[1,:], 'g--', linewidth=2)
-axs[1].grid()
-axs[1].set_ylabel('$y$')
+  axs[2].plot(tt_hor, xx_star[2,:], linewidth=2)
+  axs[2].plot(tt_hor, xx_ref[2,:], 'r--', linewidth=2)
+  axs[2].grid()
+  axs[2].set_ylabel('$psi$')
 
-axs[2].plot(tt_hor, xx_star[2,:], linewidth=2)
-axs[2].plot(tt_hor, xx_ref[2,:], 'g--', linewidth=2)
-axs[2].grid()
-axs[2].set_ylabel('$psi$')
+  axs[3].plot(tt_hor, xx_star[3,:], linewidth=2)
+  axs[3].plot(tt_hor, xx_ref[3,:], 'r--', linewidth=2)
+  axs[3].grid()
+  axs[3].set_ylabel('$V$')
 
-axs[3].plot(tt_hor, xx_star[3,:], linewidth=2)
-axs[3].plot(tt_hor, xx_ref[3,:], 'g--', linewidth=2)
-axs[3].grid()
-axs[3].set_ylabel('$V$')
+  axs[4].plot(tt_hor, xx_star[4,:], linewidth=2)
+  axs[4].plot(tt_hor, xx_ref[4,:], 'r--', linewidth=2)
+  axs[4].grid()
+  axs[4].set_ylabel('$beta$')
 
-axs[4].plot(tt_hor, xx_star[4,:], linewidth=2)
-axs[4].plot(tt_hor, xx_ref[4,:], 'g--', linewidth=2)
-axs[4].grid()
-axs[4].set_ylabel('$beta$')
+  axs[5].plot(tt_hor, xx_star[5,:], linewidth=2)
+  axs[5].plot(tt_hor, xx_ref[5,:], 'r--', linewidth=2)
+  axs[5].grid()
+  axs[5].set_ylabel('$psi dot$')
 
-axs[5].plot(tt_hor, xx_star[5,:], linewidth=2)
-axs[5].plot(tt_hor, xx_ref[5,:], 'g--', linewidth=2)
-axs[5].grid()
-axs[5].set_ylabel('$psi dot$')
+  axs[6].plot(tt_hor, uu_star[0,:], 'g', linewidth=2)
+  axs[6].plot(tt_hor, uu_ref[0,:], 'r--', linewidth=2)
+  axs[6].grid()
+  axs[6].set_ylabel('$delta$')
 
-axs[6].plot(tt_hor, uu_star[0,:], 'r', linewidth=2)
-axs[6].plot(tt_hor, uu_ref[0,:], 'g--', linewidth=2)
-axs[6].grid()
-axs[6].set_ylabel('$delta$')
+  axs[7].plot(tt_hor, uu_star[1,:],'g', linewidth=2)
+  axs[7].plot(tt_hor, uu_ref[1,:], 'r--', linewidth=2)
+  axs[7].grid()
+  axs[7].set_ylabel('$F$')
+  axs[7].set_xlabel('time')
 
-axs[7].plot(tt_hor, uu_star[1,:],'r', linewidth=2)
-axs[7].plot(tt_hor, uu_ref[1,:], 'g--', linewidth=2)
-axs[7].grid()
-axs[7].set_ylabel('$F$')
-axs[7].set_xlabel('time')
+  plt.show()
 
-plt.show()
+  # Plotting the trajectory
+  plt.plot(xx_star[0,:], xx_star[1,:], label='Optimal Trajectory')
+  plt.plot(xx_ref[0,:], xx_ref[1,:],'r--', label='Reference Trajectory')
+  plt.title('Vehicle Trajectory')
+  plt.xlabel('X-axis')
+  plt.ylabel('Y-axis')
+  plt.legend()
+  plt.grid(True)
+  plt.show()
 
-# Plotting the trajectory
-plt.plot(xx_star[0,:], xx_star[1,:], label='Optimal Trajectory')
-plt.plot(xx_ref[0,:], xx_ref[1,:],'r--', label='Reference Trajectory')
-plt.title('Vehicle Trajectory')
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.legend()
-plt.grid(True)
-plt.show()
+
 
 #######################################################################
 ############### TASK 3: TRAJECTORY TRACKING VIA LQR ###################
 #######################################################################
 
-A_opt = np.zeros((ns, ns, TT))
-B_opt = np.zeros((ns, ni, TT))
-Qt_reg = np.zeros((ns, ns, TT))
-Rt_reg = np.zeros((ni, ni, TT))
+purple_bold_title = "\033[1;35m\nTASK 3: TRACKING VIA LQR (II)\033[0m"
+print(purple_bold_title) 
 
-for tt in range (TT):
-  fx, fu = dyn.dynamics(xx_star[:,tt], uu_star[:,tt])[1:]
+if Task3 == True & Task2 == True:
 
-  A_opt[:,:,tt] = fx.T
-  B_opt[:,:,tt] = fu.T
+  A_opt = np.zeros((ns, ns, TT))
+  B_opt = np.zeros((ns, ni, TT))
+  Qt_reg = np.zeros((ns, ns, TT))
+  Rt_reg = np.zeros((ni, ni, TT))
 
-  Qt_reg[:,:,tt] = cst.QQt
-  Rt_reg[:,:,tt] = cst.RRt
+  for tt in range (TT):
+    fx, fu = dyn.dynamics(xx_star[:,tt], uu_star[:,tt])[1:]
 
-QT_reg = cst.QQT
+    A_opt[:,:,tt] = fx.T
+    B_opt[:,:,tt] = fu.T
+
+    Qt_reg[:,:,tt] = cst.QQt
+    Rt_reg[:,:,tt] = cst.RRt
+
+  QT_reg = cst.QQT
 
 
-def lti_LQR(AA, BB, QQ, RR, QQf, TT):
+  def lti_LQR(AA, BB, QQ, RR, QQf, TT):
 
-  """
-      LQR for LTI system with fixed cost	
-      
-  Args
-      - AA (nn x nn) matrix
-      - BB (nn x mm) matrix
-      - QQ (nn x nn), RR (mm x mm) stage cost
-      - QQf (nn x nn) terminal cost
-      - TT time horizon
-  Return
-      - KK (mm x nn x TT) optimal gain sequence
-      - PP (nn x nn x TT) riccati matrix
-  """
-      
-  ns = AA.shape[1]
-  ni = BB.shape[1]
+    """
+        LQR for LTI system with fixed cost	
+        
+    Args
+        - AA (nn x nn) matrix
+        - BB (nn x mm) matrix
+        - QQ (nn x nn), RR (mm x mm) stage cost
+        - QQf (nn x nn) terminal cost
+        - TT time horizon
+    Return
+        - KK (mm x nn x TT) optimal gain sequence
+        - PP (nn x nn x TT) riccati matrix
+    """
+        
+    ns = AA.shape[1]
+    ni = BB.shape[1]
 
-  PP = np.zeros((ns,ns,TT))
-  KK = np.zeros((ni,ns,TT))
-  
-  PP[:,:,-1] = QQf
-  
-  # Solve Riccati equation
-  for tt in reversed(range(TT-1)):
-    QQt = QQ[:,:,tt]
-    RRt = RR[:,:,tt]
-    AAt = AA[:,:,tt]
-    BBt = BB[:,:,tt]
-    PPtp = PP[:,:,tt+1]
+    PP = np.zeros((ns,ns,TT))
+    KK = np.zeros((ni,ns,TT))
     
-    PP[:,:,tt] = QQt + AAt.T@PPtp@AAt - (AAt.T@PPtp@BBt)@np.linalg.inv((RRt + BBt.T@PPtp@BBt))@(BBt.T@PPtp@AAt)
-  
-  # Evaluate KK
+    PP[:,:,-1] = QQf
+    
+    # Solve Riccati equation
+    for tt in reversed(range(TT-1)):
+      QQt = QQ[:,:,tt]
+      RRt = RR[:,:,tt]
+      AAt = AA[:,:,tt]
+      BBt = BB[:,:,tt]
+      PPtp = PP[:,:,tt+1]
+      
+      PP[:,:,tt] = QQt + AAt.T@PPtp@AAt - (AAt.T@PPtp@BBt)@np.linalg.inv((RRt + BBt.T@PPtp@BBt))@(BBt.T@PPtp@AAt)
+    
+    # Evaluate KK
+    for tt in range(TT-1):
+      QQt = QQ[:,:,tt]
+      RRt = RR[:,:,tt]
+      AAt = AA[:,:,tt]
+      BBt = BB[:,:,tt]
+      PPtp = PP[:,:,tt+1]
+      
+      KK[:,:,tt] = -np.linalg.inv(RRt + BBt.T@PPtp@BBt)@(BBt.T@PPtp@AAt)
+
+    return KK
+      
+  KK_reg = lti_LQR(A_opt, B_opt, Qt_reg, Rt_reg, QT_reg, TT)
+
+  xx_temp = np.zeros((ns,TT))
+  uu_temp = np.zeros((ni,TT))
+
+  xx_temp[:,0] = np.array((0,0,0,2,0.3,0.01))      # initial conditions different from the ones of xx0_star 
+
   for tt in range(TT-1):
-    QQt = QQ[:,:,tt]
-    RRt = RR[:,:,tt]
-    AAt = AA[:,:,tt]
-    BBt = BB[:,:,tt]
-    PPtp = PP[:,:,tt+1]
-    
-    KK[:,:,tt] = -np.linalg.inv(RRt + BBt.T@PPtp@BBt)@(BBt.T@PPtp@AAt)
+    uu_temp[:,tt] = uu_star[:,tt] + KK_reg[:,:,tt]@(xx_temp[:,tt]-xx_star[:,tt])
+    xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
-  return KK
-    
-KK_reg = lti_LQR(A_opt, B_opt, Qt_reg, Rt_reg, QT_reg, TT)
+  uu_reg = uu_temp
+  xx_reg = xx_temp
 
-xx_temp = np.zeros((ns,TT))
-uu_temp = np.zeros((ni,TT))
+  ##############################################################
+  # Design REGULARIZED TRAJECTORY  
+  ##############################################################
 
-xx_temp[:,0] = np.array((0,0,0,2,0.3,0.01))      # initial conditions different from the ones of xx0_star 
+  fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-for tt in range(TT-1):
-  uu_temp[:,tt] = uu_star[:,tt] + KK_reg[:,:,tt]@(xx_temp[:,tt]-xx_star[:,tt])
-  xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
+  axs[0].plot(tt_hor, xx_reg[0,:], linewidth=2)
+  axs[0].plot(tt_hor, xx_star[0,:], 'r--', linewidth=2)
+  axs[0].grid()
+  axs[0].set_ylabel('$x$')
 
-uu_reg = uu_temp
-xx_reg = xx_temp
+  axs[1].plot(tt_hor, xx_reg[1,:], linewidth=2)
+  axs[1].plot(tt_hor, xx_star[1,:], 'r--', linewidth=2)
+  axs[1].grid()
+  axs[1].set_ylabel('$y$')
 
-##############################################################
-# Design REGULARIZED TRAJECTORY  
-##############################################################
+  axs[2].plot(tt_hor, xx_reg[2,:], linewidth=2)
+  axs[2].plot(tt_hor, xx_star[2,:], 'r--', linewidth=2)
+  axs[2].grid()
+  axs[2].set_ylabel('$psi$')
 
-fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+  axs[3].plot(tt_hor, xx_reg[3,:], linewidth=2)
+  axs[3].plot(tt_hor, xx_star[3,:], 'r--', linewidth=2)
+  axs[3].grid()
+  axs[3].set_ylabel('$V$')
 
-axs[0].plot(tt_hor, xx_reg[0,:], linewidth=2)
-axs[0].plot(tt_hor, xx_star[0,:], 'g--', linewidth=2)
-axs[0].grid()
-axs[0].set_ylabel('$x$')
+  axs[4].plot(tt_hor, xx_reg[4,:], linewidth=2)
+  axs[4].plot(tt_hor, xx_star[4,:], 'r--', linewidth=2)
+  axs[4].grid()
+  axs[4].set_ylabel('$beta$')
 
-axs[1].plot(tt_hor, xx_reg[1,:], linewidth=2)
-axs[1].plot(tt_hor, xx_star[1,:], 'g--', linewidth=2)
-axs[1].grid()
-axs[1].set_ylabel('$y$')
+  axs[5].plot(tt_hor, xx_reg[5,:], linewidth=2)
+  axs[5].plot(tt_hor, xx_star[5,:], 'r--', linewidth=2)
+  axs[5].grid()
+  axs[5].set_ylabel('$psi dot$')
 
-axs[2].plot(tt_hor, xx_reg[2,:], linewidth=2)
-axs[2].plot(tt_hor, xx_star[2,:], 'g--', linewidth=2)
-axs[2].grid()
-axs[2].set_ylabel('$psi$')
+  axs[6].plot(tt_hor, uu_reg[0,:], 'r', linewidth=2)
+  axs[6].plot(tt_hor, uu_star[0,:], 'r--', linewidth=2)
+  axs[6].grid()
+  axs[6].set_ylabel('$delta$')
 
-axs[3].plot(tt_hor, xx_reg[3,:], linewidth=2)
-axs[3].plot(tt_hor, xx_star[3,:], 'g--', linewidth=2)
-axs[3].grid()
-axs[3].set_ylabel('$V$')
+  axs[7].plot(tt_hor, uu_reg[1,:],'r', linewidth=2)
+  axs[7].plot(tt_hor, uu_star[1,:], 'r--', linewidth=2)
+  axs[7].grid()
+  axs[7].set_ylabel('$F$')
+  axs[7].set_xlabel('time')
+  
+  fig.suptitle("Trajectory tracking via LQR")
+  plt.show()
 
-axs[4].plot(tt_hor, xx_reg[4,:], linewidth=2)
-axs[4].plot(tt_hor, xx_star[4,:], 'g--', linewidth=2)
-axs[4].grid()
-axs[4].set_ylabel('$beta$')
+  # Plotting the trajectory
+  plt.plot(xx_star[0,:], xx_star[1,:], label='Regularized Trajectory')
+  plt.plot(xx_reg[0,:], xx_reg[1,:],'r--', label='Optimal Trajectory')
+  plt.title('Vehicle Trajectory')
+  plt.xlabel('X-axis')
+  plt.ylabel('Y-axis')
+  plt.legend()
+  plt.grid(True)
+  plt.show()
 
-axs[5].plot(tt_hor, xx_reg[5,:], linewidth=2)
-axs[5].plot(tt_hor, xx_star[5,:], 'g--', linewidth=2)
-axs[5].grid()
-axs[5].set_ylabel('$psi dot$')
-
-axs[6].plot(tt_hor, uu_reg[0,:], 'r', linewidth=2)
-axs[6].plot(tt_hor, uu_star[0,:], 'g--', linewidth=2)
-axs[6].grid()
-axs[6].set_ylabel('$delta$')
-
-axs[7].plot(tt_hor, uu_reg[1,:],'r', linewidth=2)
-axs[7].plot(tt_hor, uu_star[1,:], 'g--', linewidth=2)
-axs[7].grid()
-axs[7].set_ylabel('$F$')
-axs[7].set_xlabel('time')
-
-plt.show()
-
-# Plotting the trajectory
-plt.plot(xx_star[0,:], xx_star[1,:], label='Regularized Trajectory')
-plt.plot(xx_reg[0,:], xx_reg[1,:],'r--', label='Optimal Trajectory')
-plt.title('Vehicle Trajectory')
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.legend()
-plt.grid(True)
-plt.show()
 
 
 #######################################################################
 ############## TASK 4: TRAJECTORY TRACKING VIA MPC ####################
 #######################################################################
-Tsim = TT
 
-def linear_mpc(AA, BB, QQ, RR, QQf, xxt, umax, umin, xmax, xmin, T_pred):
-  """
-  Linear MPC solver - Constrained LQR
+purple_bold_title = "\033[1;35m\nTASK 4: TRAJECTORY TRACKING VIA MPC\033[0m"
+print(purple_bold_title) 
 
-  Given a measured state xxt measured at t
-  gives back the optimal input to be applied at t
+if Task4 == True & Task2 == True:
 
-  Args
-  - AA, BB: linear dynamics
-  - QQ,RR,QQf: cost matrices
-  - xxt: initial condition (at time t)
-  - T: time (prediction) horizon
+  Tsim = TT
 
-  Returns
-    - u_t: input to be applied at t
-    - xx, uu predicted trajectory
+  def linear_mpc(AA, BB, QQ, RR, QQf, xxt, umax, umin, xmax, xmin, T_pred):
+    """
+    Linear MPC solver - Constrained LQR
 
-  """
+    Given a measured state xxt measured at t
+    gives back the optimal input to be applied at t
 
-  xxt = xxt.squeeze()
+    Args
+    - AA, BB: linear dynamics
+    - QQ,RR,QQf: cost matrices
+    - xxt: initial condition (at time t)
+    - T: time (prediction) horizon
 
-  xx_mpc = cp.Variable((ns, T_pred))
-  uu_mpc = cp.Variable((ni, T_pred))
+    Returns
+      - u_t: input to be applied at t
+      - xx, uu predicted trajectory
 
-  cost = 0
-  constr = []
+    """
 
-  for tt in range(T_pred-1):
-    cost += cp.quad_form(xx_mpc[:,tt], QQ) + cp.quad_form(uu_mpc[:,tt], RR)
-    constr += [xx_mpc[:,tt+1] == AA[:,:,tt]@xx_mpc[:,tt] + BB[:,:,tt]@uu_mpc[:,tt], # dynamics constraint
-            uu_mpc[1,tt] >= umin,
-            xx_mpc[4,tt] <= xmax]
+    xxt = xxt.squeeze()
 
-  # sums problem objectives and concatenates constraints.
-  cost += cp.quad_form(xx_mpc[:,T_pred-1], QQf)
-  constr += [xx_mpc[:,0] == xxt]
+    xx_mpc = cp.Variable((ns, T_pred))
+    uu_mpc = cp.Variable((ni, T_pred))
 
-  problem = cp.Problem(cp.Minimize(cost), constr)
-  problem.solve()
+    cost = 0
+    constr = []
 
-  if problem.status == "infeasible":
-  # Otherwise, problem.value is inf or -inf, respectively.
-    print("Infeasible problem! CHECK YOUR CONSTRAINTS!!!")
+    for tt in range(T_pred-1):
+      cost += cp.quad_form(xx_mpc[:,tt], QQ) + cp.quad_form(uu_mpc[:,tt], RR)
+      constr += [xx_mpc[:,tt+1] == AA[:,:,tt]@xx_mpc[:,tt] + BB[:,:,tt]@uu_mpc[:,tt], # dynamics constraint
+              uu_mpc[1,tt] >= umin,
+              xx_mpc[4,tt] <= xmax]
 
-  return uu_mpc[:,0].value, xx_mpc.value, uu_mpc.value
+    # sums problem objectives and concatenates constraints.
+    cost += cp.quad_form(xx_mpc[:,T_pred-1], QQf)
+    constr += [xx_mpc[:,0] == xxt]
 
-#############################
-# Model Predictive Control
-#############################
+    problem = cp.Problem(cp.Minimize(cost), constr)
+    problem.solve()
 
-T_pred = 100       # MPC Prediction horizon
-u1max = 600
-u1min = 0
+    if problem.status == "infeasible":
+    # Otherwise, problem.value is inf or -inf, respectively.
+      print("Infeasible problem! CHECK YOUR CONSTRAINTS!!!")
 
-x4max = 0.15
-x4min = 0
+    return uu_mpc[:,0].value, xx_mpc.value, uu_mpc.value
 
-xx_real_mpc = np.zeros((ns,Tsim))
-uu_real_mpc = np.zeros((ni,Tsim))
+  #############################
+  # Model Predictive Control
+  #############################
 
-xx_mpc = np.zeros((ns, T_pred, Tsim))
+  T_pred = int(TT/5)      # MPC Prediction horizon
+  u1max = 600
+  u1min = 0
 
-xx_real_mpc[:,0] = xx_star[:,0]
+  x4max = 0.15
+  x4min = 0
 
-for tt in range(Tsim-1):
-  # System evolution - real with MPC
+  xx_real_mpc = np.zeros((ns,Tsim))
+  uu_real_mpc = np.zeros((ni,Tsim))
 
-  xx_t_mpc = xx_real_mpc[:,tt] # get initial condition
+  xx_mpc = np.zeros((ns, T_pred, Tsim))
 
-  # Solve MPC problem - apply first input
+  xx_real_mpc[:,0] = xx_star[:,0]
 
-  if tt%500 == 0: # print every 5 time instants
-    print('MPC:\t t = {}'.format(tt*dt))
+  for tt in range(Tsim-1):
+    # System evolution - real with MPC
 
-  uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, cst.QQt, cst.RRt, cst.QQT, xx_t_mpc, umax=u1max, umin=u1min, xmax = x4max, xmin = x4min, T_pred = T_pred)[:2]
-  
-  xx_real_mpc[:,tt+1] = dyn.dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
+    xx_t_mpc = xx_real_mpc[:,tt] # get initial condition
 
-#######################################
-# Plots
-#######################################
+    # Solve MPC problem - apply first input
 
-time = np.arange(Tsim)
+    if tt%5 == 0: # print every 5 time instants
+      print('MPC:\t t = {}'.format(tt))
 
-fig, axs = plt.subplots(ns+ni, 1, sharex='all')
+    uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, cst.QQt, cst.RRt, cst.QQT, xx_t_mpc, umax=u1max, umin=u1min, xmax = x4max, xmin = x4min, T_pred = T_pred)[:2]
+    
+    xx_real_mpc[:,tt+1] = dyn.dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
 
-axs[0].plot(time, xx_real_mpc[0,:], linewidth=2)
-axs[0].plot(time, xx_star[0,:],'--r', linewidth=2)
-axs[0].grid()
-axs[0].set_ylabel('$x$')
-axs[0].set_xlim([-1,Tsim])
-axs[0].legend(['MPC', 'OPT'])
+  #######################################
+  # Plots
+  #######################################
 
-#####
-axs[1].plot(time, xx_real_mpc[1,:], linewidth=2)
-axs[1].plot(time, xx_star[1,:], '--r', linewidth=2)
-axs[1].grid()
-axs[1].set_ylabel('$y$')
-axs[1].set_xlim([-1,Tsim])
-axs[1].legend(['MPC', 'OPT'])
+  time = np.arange(Tsim)
 
-#####
-axs[2].plot(time, xx_real_mpc[2,:], linewidth=2)
-axs[2].plot(time, xx_star[2,:], '--r', linewidth=2)
-axs[2].grid()
-axs[2].set_ylabel('$psi$')
-axs[2].set_xlim([-1,Tsim])
-axs[2].legend(['MPC', 'OPT'])
+  fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-#####
-axs[3].plot(time, xx_real_mpc[3,:], linewidth=2)
-axs[3].plot(time, xx_star[3,:], '--r', linewidth=2)
-axs[3].grid()
-axs[3].set_ylabel('$V$')
-axs[3].set_xlim([-1,Tsim])
-axs[3].legend(['MPC', 'OPT'])
+  axs[0].plot(time, xx_real_mpc[0,:], linewidth=2)
+  axs[0].plot(time, xx_star[0,:],'--r', linewidth=2)
+  axs[0].grid()
+  axs[0].set_ylabel('$x$')
+  axs[0].set_xlim([-1,Tsim])
+  axs[0].legend(['MPC', 'OPT'])
 
-#####
-axs[4].plot(time, xx_real_mpc[4,:], linewidth=2)
-axs[4].plot(time, xx_star[4,:], '--r', linewidth=2)
+  #####
+  axs[1].plot(time, xx_real_mpc[1,:], linewidth=2)
+  axs[1].plot(time, xx_star[1,:], '--r', linewidth=2)
+  axs[1].grid()
+  axs[1].set_ylabel('$y$')
+  axs[1].set_xlim([-1,Tsim])
+  axs[1].legend(['MPC', 'OPT'])
 
-if x4max < 1.1*np.amax(xx_real_mpc[4,:]): # draw constraints only if active
-  axs[4].plot(time, np.ones(Tsim)*x4max, '--g', linewidth=1)
-  axs[1].plot(time, np.ones(Tsim)*x4min, '--g', linewidth=1)
+  #####
+  axs[2].plot(time, xx_real_mpc[2,:], linewidth=2)
+  axs[2].plot(time, xx_star[2,:], '--r', linewidth=2)
+  axs[2].grid()
+  axs[2].set_ylabel('$psi$')
+  axs[2].set_xlim([-1,Tsim])
+  axs[2].legend(['MPC', 'OPT'])
 
-axs[4].grid()
-axs[4].set_ylabel('$beta$')
-axs[4].set_xlim([-1,Tsim])
-axs[4].legend(['MPC', 'OPT'])
+  #####
+  axs[3].plot(time, xx_real_mpc[3,:], linewidth=2)
+  axs[3].plot(time, xx_star[3,:], '--r', linewidth=2)
+  axs[3].grid()
+  axs[3].set_ylabel('$V$')
+  axs[3].set_xlim([-1,Tsim])
+  axs[3].legend(['MPC', 'OPT'])
 
-#####
-axs[5].plot(time, xx_real_mpc[5,:], linewidth=2)
-axs[5].plot(time, xx_star[5,:], '--r', linewidth=2)
-axs[5].grid()
-axs[5].set_ylabel('$psi dot$')
-axs[5].set_xlim([-1,Tsim])
-axs[5].legend(['MPC', 'OPT'])
+  #####
+  axs[4].plot(time, xx_real_mpc[4,:], linewidth=2)
+  axs[4].plot(time, xx_star[4,:], '--r', linewidth=2)
 
-#####
-axs[6].plot(time, uu_real_mpc[0,:],'g', linewidth=2)
-axs[6].plot(time, uu_star[0,:],'--r', linewidth=2)
-axs[6].grid()
-axs[6].set_ylabel('$delta$')
-axs[6].set_xlabel('time')
-axs[6].set_xlim([-1,Tsim])
-axs[6].legend(['MPC', 'OPT'])
+  if x4max < 1.1*np.amax(xx_real_mpc[4,:]): # draw constraints only if active
+    axs[4].plot(time, np.ones(Tsim)*x4max, '--g', linewidth=1)
+    axs[1].plot(time, np.ones(Tsim)*x4min, '--g', linewidth=1)
 
-#####
-axs[7].plot(time, uu_real_mpc[1,:],'g', linewidth=2)
-axs[7].plot(time, uu_star[1,:],'--r', linewidth=2)
+  axs[4].grid()
+  axs[4].set_ylabel('$beta$')
+  axs[4].set_xlim([-1,Tsim])
+  axs[4].legend(['MPC', 'OPT'])
 
-if u1max < 1.1*np.amax(uu_real_mpc[1,:]): # draw constraints only if active
-  axs[7].plot(time, np.ones(Tsim)*u1max, '--g', linewidth=1)
-  axs[7].plot(time, np.ones(Tsim)*u1min, '--g', linewidth=1)
+  #####
+  axs[5].plot(time, xx_real_mpc[5,:], linewidth=2)
+  axs[5].plot(time, xx_star[5,:], '--r', linewidth=2)
+  axs[5].grid()
+  axs[5].set_ylabel('$psi dot$')
+  axs[5].set_xlim([-1,Tsim])
+  axs[5].legend(['MPC', 'OPT'])
 
-axs[7].grid()
-axs[7].set_ylabel('$F$')
-axs[7].set_xlabel('time')
-axs[7].set_xlim([-1,Tsim])
-axs[7].legend(['MPC', 'OPT'])
+  #####
+  axs[6].plot(time, uu_real_mpc[0,:],'g', linewidth=2)
+  axs[6].plot(time, uu_star[0,:],'--r', linewidth=2)
+  axs[6].grid()
+  axs[6].set_ylabel('$delta$')
+  axs[6].set_xlabel('time')
+  axs[6].set_xlim([-1,Tsim])
+  axs[6].legend(['MPC', 'OPT'])
 
-fig.align_ylabels(axs)
+  #####
+  axs[7].plot(time, uu_real_mpc[1,:],'g', linewidth=2)
+  axs[7].plot(time, uu_star[1,:],'--r', linewidth=2)
 
-plt.show()
+  if u1max < 1.1*np.amax(uu_real_mpc[1,:]): # draw constraints only if active
+    axs[7].plot(time, np.ones(Tsim)*u1max, '--g', linewidth=1)
+    axs[7].plot(time, np.ones(Tsim)*u1min, '--g', linewidth=1)
+
+  axs[7].grid()
+  axs[7].set_ylabel('$F$')
+  axs[7].set_xlabel('time')
+  axs[7].set_xlim([-1,Tsim])
+  axs[7].legend(['MPC', 'OPT'])
+
+  fig.align_ylabels(axs)
+
+  plt.show()
+
 
 
 #######################################################################
 ######################## TASK 5: ANIMATION ############################
 #######################################################################
 
+purple_bold_title = "\033[1;35m\nTASK 5: ANIMATION\033[0m"
+print(purple_bold_title) 
+
 time = np.arange(len(tt_hor))*dt
 
-if visu_animation:
+if Task5:
     
   fig = plt.figure()
-  ax = fig.add_subplot(111, autoscale_on=False, xlim=(min(xx_ref[0,:])-1, max(xx_ref[0,:])+1), ylim=(min(uu_ref[0,:])-1, max(uu_ref)+1))
+  ax = fig.add_subplot(111, autoscale_on=False, xlim=(min(xx_ref[0,:])-1, max(xx_ref[0,:])+1), ylim=(min(xx_ref[1,:])-1, max(xx_ref[1,:])+1))
   ax.grid()
   # no labels
   ax.set_yticklabels([])

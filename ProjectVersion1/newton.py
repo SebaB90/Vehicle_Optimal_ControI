@@ -190,183 +190,13 @@ def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = Non
         sigma[:,tt] = sigma_t.squeeze()
 
 
-    
-
     for tt in range(TT - 1):
+        
         # Trajectory
-
         uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
         xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
 
         xx[:,tt+1] = xx_p
-
-        '''
-
-        """
-            LQR for LTV system with (time-varying) affine cost
-            
-        Args
-            - AAin (nn x nn (x TT)) matrix
-            - BBin (nn x mm (x TT)) matrix
-            - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
-            - QQfin (nn x nn) terminal cost
-            - qq (nn x (x TT)) affine terms
-            - rr (mm x (x TT)) affine terms
-            - qqf (nn x (x TT)) affine terms - final cost
-            - TT time horizon
-        Return
-            - KK (mm x nn x TT) optimal gain sequence
-            - PP (nn x nn x TT) riccati matrix
-        """
-            
-        try:
-            # check if matrix is (.. x .. x TT) - 3 dimensional array 
-            ns, lA = AAin.shape[1:]
-        except:
-            # if not 3 dimensional array, make it (.. x .. x 1)
-            AAin = AAin[:,:,None]
-            ns, lA = AAin.shape[1:]
-
-        try:  
-            ni, lB = BBin.shape[1:]
-        except:
-            BBin = BBin[:,:,None]
-            ni, lB = BBin.shape[1:]
-
-        try:
-            nQ, lQ = QQin.shape[1:]
-        except:
-            QQin = QQin[:,:,None]
-            nQ, lQ = QQin.shape[1:]
-
-        try:
-            nR, lR = RRin.shape[1:]
-        except:
-            RRin = RRin[:,:,None]
-            nR, lR = RRin.shape[1:]
-
-        try:
-            nSi, nSs, lS = SSin.shape
-        except:
-            SSin = SSin[:,:,None]
-            nSi, nSs, lS = SSin.shape
-
-        # Check dimensions consistency -- safety
-        if nQ != ns:
-            print("Matrix Q does not match number of states")
-            exit()
-        if nR != ni:
-            print("Matrix R does not match number of inputs")
-            exit()
-        if nSs != ns:
-            print("Matrix S does not match number of states")
-            exit()
-        if nSi != ni:
-            print("Matrix S does not match number of inputs")
-            exit()
-
-
-        if lA < TT:
-            AAin = AAin.repeat(TT, axis=2)
-        if lB < TT:
-            BBin = BBin.repeat(TT, axis=2)
-        if lQ < TT:
-            QQin = QQin.repeat(TT, axis=2)
-        if lR < TT:
-            RRin = RRin.repeat(TT, axis=2)
-        if lS < TT:
-            SSin = SSin.repeat(TT, axis=2)
-
-        # Check for affine terms
-
-        KK = np.zeros((ni, ns, TT))
-        sigma = np.zeros((ni, TT))
-        PP = np.zeros((ns, ns, TT))
-        pp = np.zeros((ns, TT))
-
-        QQ = QQin
-        RR = RRin
-        SS = SSin
-        QQf = QQfin
-        
-        qq = qqin
-        rr = rrin
-        cc = ccin
-
-        qqf = qqfin
-
-        AA = AAin
-        BB = BBin
-
-        xx = np.zeros((ns, TT))
-        uu = np.zeros((ni, TT))
-
-        xx[:,0] = x0
-        
-        PP[:,:,-1] = QQf
-        pp[:,-1] = qqf
-
-        # Evaluate KK and PP
-        
-        for tt in reversed(range(TT-1)):
-            QQt = QQ[:,:,tt]
-            qqt = qq[:,tt][:,None]
-            RRt = RR[:,:,tt]
-            rrt = rr[:,tt][:,None]
-            AAt = AA[:,:,tt]
-            BBt = BB[:,:,tt]
-            SSt = SS[:,:,tt]
-            PPtp = PP[:,:,tt+1]
-            pptp = pp[:,tt+1][:,None]
-            cct = cc[:,tt][:,None]
-
-            # Evaluate K
-            #if pptp[0,0] != pptp[0,0]:
-            #  print('\n\nqqt + AAt.T@pptp + AAt.T@PPtp@cct + KKt.T@(RRt + BBt.T@PPtp@BBt)@sigma_t',qqt + AAt.T@pptp + AAt.T@PPtp@cct + KKt.T@(RRt + BBt.T@PPtp@BBt)@sigma_t,
-            #       '\n\qqt',qqt,'\n\AAt',AAt,'\n\pptp',pptp,'\n\KKt',KKt,'\n\RRt',RRt,'\n\sigma_t',sigma_t)
-            #  sys.exit()
-            
-            if pptp[0,0] != pptp[0,0]:
-                print('\n\pptp0')
-                sys.exit()
-            if pptp[1,0] != pptp[1,0]:
-                print('\n\pptp1')
-                sys.exit()
-
-
-            KKt =  -np.linalg.inv((RRt+BBt.T@PPtp@BBt)) @(SSt+BBt.T@PPtp@AAt)
-            sigma_t = -np.linalg.inv((RRt+BBt.T@PPtp@BBt)) @(rrt+BBt.T@pptp+BBt.T@PPtp@cct)
-
-
-            if sigma_t[0,0] != sigma_t[0,0]:
-                print('\n\nrrt+BBt.T@pptp+BBt.T@PPtp@cct',rrt+BBt.T@pptp+BBt.T@PPtp@cct,'\n\nrrt',rrt,'\n\npptp',pptp,'\n\ncct',cct)
-                sys.exit()
-            
-            KK[:,:,tt] = KKt
-            sigma[:,tt] = sigma_t.squeeze()
-
-            # Solve Riccati Equation
-
-            ppt = qqt + AAt.T@pptp + AAt.T@PPtp@cct + KKt.T@(RRt + BBt.T@PPtp@BBt)@sigma_t
-            PPt = QQt + AAt.T@PPtp@AAt - KKt.T@(RRt + BBt.T@PPtp@BBt)@KKt
-
-            if ppt[0,0] == float('-inf'):
-            print('\n\nqqt + AAt.T@pptp + AAt.T@PPtp@cct + KKt.T@(RRt + BBt.T@PPtp@BBt)@sigma_t',qqt + AAt.T@pptp + AAt.T@PPtp@cct + KKt.T@(RRt + BBt.T@PPtp@BBt)@sigma_t,
-                '\n\nqqt',qqt,'\n\nAAt',AAt,'\n\npptp',pptp,'\n\nKKt',KKt,'\n\nRRt',RRt,'\n\nsigma_t',sigma_t,'\n\nPPtp',PPtp)
-            sys.exit()
-
-
-            PP[:,:,tt] = PPt
-            pp[:,tt] = ppt.squeeze()
-        
-
-        for tt in range(TT - 1):
-            # Trajectory
-            uu[:, tt] = KK[:,:,tt]@xx[:, tt] + sigma[:,tt]
-            xx_p = AA[:,:,tt]@xx[:,tt] + BB[:,:,tt]@uu[:, tt]
-
-            xx[:,tt+1] = xx_p
-        '''
         
     return xx, uu, KK, sigma
 
@@ -410,7 +240,6 @@ def Newton (xx, uu, xx_ref, uu_ref, x0, max_iters):
             A[:,:,tt] = fx.T
             B[:,:,tt] = fu.T 
 
-        print(J[kk])
         temp_cost = cst.termcost(xx[:,-1,kk], xx_ref[:,-1])[0]
         J[kk] += temp_cost
 
