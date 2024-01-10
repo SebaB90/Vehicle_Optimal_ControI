@@ -30,9 +30,9 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 ############################################################
 
 test = False  # Set true for testing the open loop dynamics and the correctness of the derivatives
-max_iters = 10  # Choose the maximum number of iteration for the Newton's method
+max_iters = 20  # Choose the maximum number of iteration for the Newton's method
 # Set to true the task that you want to simulate
-Task1 = False  # Newton's method on a first try reference trajectory
+Task1 = True  # Newton's method on a first try reference trajectory
 Task2 = True  # Newton's method with smoothed trajectory
 Task3 = True  # Trajectory tracking via LQR, task 2 must be set to true
 Task4 = True  # MPC, Task2 must be set to true
@@ -114,10 +114,6 @@ if test == True and ns==6:
     ######################################
     # CHECK OF THE DERIVATIVES
     ######################################
-    '''
-    As simple test we check if:
-        f(x_bar + dltx) - f(x_bar) = df/dx(evaluated in x_bar) * dltx
-    '''
 
     # Define the infinitesimal increments for evaluating the derivatives
     dx = 1e-3 
@@ -157,7 +153,6 @@ if test == True and ns==6:
     print(blue_bold_title)
     print(f'\nError in derivatives of x is:\n{check_x}')
     print(f'\nError in derivatives of u is:\n{check_u}\n')
-
 
 
 ########################################################################
@@ -693,20 +688,6 @@ if Task3 == True & Task2 == True:
 
 
   def lti_LQR(AA, BB, QQ, RR, QQf, TT):
-
-    """
-        LQR for LTI system with fixed cost	
-        
-    Args
-        - AA (nn x nn) matrix
-        - BB (nn x mm) matrix
-        - QQ (nn x nn), RR (mm x mm) stage cost
-        - QQf (nn x nn) terminal cost
-        - TT time horizon
-    Return
-        - KK (mm x nn x TT) optimal gain sequence
-        - PP (nn x nn x TT) riccati matrix
-    """
         
     ns = AA.shape[1]
     ni = BB.shape[1]
@@ -825,24 +806,7 @@ if Task4 == True & Task2 == True:
 
   Tsim = TT
 
-  def linear_mpc(AA, BB, QQ, RR, tl, QQf, xxt, umax, umin, xmax, xmin, T_pred):
-    """
-    Linear MPC solver - Constrained LQR
-
-    Given a measured state xxt measured at t
-    gives back the optimal input to be applied at t
-
-    Args
-    - AA, BB: linear dynamics
-    - QQ,RR,QQf: cost matrices
-    - xxt: initial condition (at time t)
-    - T: time (prediction) horizon
-
-    Returns
-      - u_t: input to be applied at t
-      - xx, uu predicted trajectory
-
-    """
+  def linear_mpc(AA, BB, QQ, RR, tl, QQf, xxt, umax, xmin, T_pred):
 
     xxt = xxt.squeeze()
     
@@ -892,16 +856,15 @@ if Task4 == True & Task2 == True:
   for tt in range(Tsim-T_pred-1):
     # System evolution - real with MPC
 
-    xx_t_mpc = xx_real_mpc[:,tt] # get initial condition
-    #uu_t_mpc = uu_real_mpc[:,tt] # get initial condition
+    xx_t_mpc = xx_real_mpc[:,tt]  # get initial condition
 
     # Solve MPC problem - apply first input
 
-    if tt%10 == 0: # print every 5 time instants
+    if tt%10 == 0: # print every 10 time instants
       print('MPC:\t t = {:.1f} sec.'.format(tt*dt))
     
-    QQt = np.diag([1, 1, 100.0, 1.0, 100, 100])   # cost for xx = [x,y,psi,V,Beta,psidot]
-    RRt = np.diag([1000, 1.0])    # co0sts for uu = [Delta,F]
+    QQt = np.diag([1, 1, 100.0, 1.0, 100.0, 100.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
+    RRt = np.diag([1000.0, 1.0])                      # costs for uu = [Delta,F]
     QQT = QQt  # Terminal cost matrix
     
     uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, QQt, RRt, tt, QQT, xx_t_mpc, umax=u1max, xmin=x4min, T_pred = T_pred)[:2]
@@ -913,6 +876,7 @@ if Task4 == True & Task2 == True:
   #######################################
 
   time = np.arange(Tsim-T_pred)
+  print('\nt sim\n', Tsim,'\nt pred\n', T_pred, '\nshape xx mpc\n', np.shape(xx_real_mpc), '\nshape time\n', np.shape(time), '\nspae xx star\n', np.shape(xx_star))
 
   fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
@@ -951,7 +915,7 @@ if Task4 == True & Task2 == True:
   axs[4].plot(time, xx_real_mpc[4,:Tsim-T_pred],'m', linewidth=2)
   axs[4].plot(time, xx_star[4,:Tsim-T_pred], '--g', linewidth=2)
   
-  if x4max < 1.1*np.amax(xx_real_mpc[4,:Tsim-T_pred]): # draw constraints only if active
+  if x4min > 1.1*np.amin(xx_real_mpc[4,:Tsim-T_pred]): # draw constraints only if active
     axs[4].plot(time, np.ones(Tsim-T_pred)*x4min, '--r', linewidth=1)
     
   axs[4].grid()
@@ -992,7 +956,6 @@ if Task4 == True & Task2 == True:
   fig.align_ylabels(axs)
 
   plt.show()
-
 
 
 #######################################################################

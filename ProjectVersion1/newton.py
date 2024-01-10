@@ -37,23 +37,6 @@ QT = cst.QQT
 
 def ltv_LQR(AAin, BBin, QQin, RRin, SSin, QQfin, TT, x0, qqin = None, rrin = None, qqfin = None, ccin = None):
     
-    """
-        LQR for LTV system with (time-varying) affine cost
-        
-    Args
-        - AAin (nn x nn (x TT)) matrix
-        - BBin (nn x mm (x TT)) matrix
-        - QQin (nn x nn (x TT)), RR (mm x mm (x TT)), SS (mm x nn (x TT)) stage cost
-        - QQfin (nn x nn) terminal cost
-        - qq (nn x (x TT)) affine terms
-        - rr (mm x (x TT)) affine terms
-        - qqf (nn x (x TT)) affine terms - final cost
-        - TT time horizon
-    Return
-        - KK (mm x nn x TT) optimal gain sequence
-        - PP (nn x nn x TT) riccati matrix
-    """
-	
     try:
         # check if matrix is (.. x .. x TT) - 3 dimensional array 
         ns, lA = AAin.shape[1:]

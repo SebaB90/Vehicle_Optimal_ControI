@@ -19,8 +19,8 @@ if ns == 2:
     QQT = QQt   # Terminal cost matrix
 
 if ns == 6:
-    QQt = 0.1*np.diag([1.0, 1.0, 1000.0, 10000.0, 1000.0, 1000.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
-    RRt = 0.1*np.diag([1000.0, 0.0001])    # co0sts for uu = [Delta,F]
+    QQt = 0.1*np.diag([1.0, 1.0, 1000.0, 10000.0, 1000.0, 1000.0])    # cost for xx = [x,y,psi,V,Beta,psidot]
+    RRt = 0.1*np.diag([1000.0, 0.0001])                               # costs for uu = [Delta,F]
     QQT = QQt   # Terminal cost matrix
     
 #######################################
@@ -28,23 +28,6 @@ if ns == 6:
 #######################################
 
 def stagecost(xx, uu, xx_ref, uu_ref):
-    """
-    Stage-cost function
-
-    Quadratic cost function 
-    l(x,u) = 1/2 (x - x_ref)^T Q (x - x_ref) + 1/2 (u - u_ref)^T R (u - u_ref)
-
-    Args:
-      - xx \in \R^6 state at time t
-      - xx_ref \in \R^6 state reference at time t
-      - uu \in \R^2 input at time t
-      - uu_ref \in \R^2 input reference at time t
-
-    Return:
-      - cost at xx,uu
-      - gradient of l wrt x, at xx,uu
-      - gradient of l wrt u, at xx,uu
-    """
 
     xx = xx[:, None]
     uu = uu[:, None]
@@ -67,19 +50,6 @@ def stagecost(xx, uu, xx_ref, uu_ref):
 #######################################
 
 def termcost(xx, xx_ref):
-    """
-    Terminal-cost function
-
-    Quadratic cost function l_T(x) = 1/2 (x - x_ref)^T Q_T (x - x_ref)
-
-    Args:
-      - xx \in \R^6 state at time t
-      - xx_ref \in \R^6 state reference at time t
-
-    Return:
-      - cost at xx
-      - gradient of l wrt x, at xx
-    """
 
     xx = xx[:, None]
     xx_ref = xx_ref[:, None]
