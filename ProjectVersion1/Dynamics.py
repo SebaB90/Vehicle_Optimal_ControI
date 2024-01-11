@@ -4,6 +4,7 @@
 # Bertamè Sebastiano
 # Bologna, 04/01/2024
 #
+
 from sympy import symbols, diff
 import numpy as np
 vehicle_dyn = True          # change to switch between bicycle or pendulum dynamics

@@ -97,7 +97,7 @@ if test == True and ns==6:
     axs[1].grid()
     axs[1].set_ylabel('$y$')
     axs[1].set_xlabel('time')
-    axs[1].set_title('Y Trajectory')  # Add a title to the first subplot
+    axs[1].set_title('Y Trajectory')  # Add a title to the second subplot
 
 
     fig.align_ylabels(axs)
@@ -189,8 +189,8 @@ if ns == 6:
   def equations(vars):
 
     Beta = [vars[1] - (x3*np.sin(x4) + aa*vars[0])/(x3*np.cos(x4)), - (x3*np.sin(x4) - bb*vars[0])/(x3*np.cos(x4))]               # Beta = [Beta_f, Beta_r]
-    Fz = [mm*gg*bb/(aa+bb), mm*gg*aa/(aa+bb)]                                                                         # Fz = [F_zf, F_zr]
-    Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                         # Fy = [F_yf, F_yr]
+    Fz = [mm*gg*bb/(aa+bb), mm*gg*aa/(aa+bb)]                                                                                     # Fz = [F_zf, F_zr]
+    Fy = [mi*Fz[0]*Beta[0], mi*Fz[1]*Beta[1]]                                                                                     # Fy = [F_yf, F_yr]
 
     return [((Fy[1] * np.sin(x4) + vars[2] * np.cos(x4 - vars[1]) + Fy[0] * np.sin(x4 - vars[1]))/mm), 
             (Fy[1] * np.cos(x4) + Fy[0] * np.cos(x4 - vars[1]) - vars[2] * np.sin(x4 - vars[1]))/(mm * x3) - vars[0], 
@@ -210,7 +210,7 @@ if ns == 6:
   eq[3,0] = np.copy(x3)                           # V
   eq[4,0] = np.copy(x4)                           # beta
   eq[5:,0] = fsolve(equations, [0.1, 0.1, 5])     # psi dot, steering angle, force
-  eq[2,0] = eq[5,0]*int(tf/2)                               # psi   
+  eq[2,0] = eq[5,0]*int(tf/2)                     # psi   
   eq[0,0] =(eq[3,0]*np.cos(eq[4,0])*np.cos(eq[2,0])-eq[3,0]*np.sin(eq[4,0])*np.sin(eq[2,0]))*int(tf/2)     # x
   eq[1,0] =(eq[3,0]*np.cos(eq[4,0])*np.sin(eq[2,0])+eq[3,0]*np.sin(eq[4,0])*np.cos(eq[2,0]))*int(tf/2)     # y
 
@@ -223,7 +223,7 @@ if ns == 6:
   eq[3,1] = np.copy(x3)                           # V
   eq[4,1] = np.copy(x4)                           # beta
   eq[5:,1] = fsolve(equations, [0.1, 0.1, 5])     # psi dot, steering angle, force
-  eq[2,1] = eq[2,0] + eq[5,1]*int(tf/2)                               # psi   
+  eq[2,1] = eq[2,0] + eq[5,1]*int(tf/2)           # psi   
   eq[0,1] = eq[0,0] + (eq[3,1]*np.cos(eq[4,1])*np.cos(eq[2,1])-eq[3,1]*np.sin(eq[4,1])*np.sin(eq[2,1]))*int(tf/2)     # x
   eq[1,1] = eq[1,0] + (eq[3,1]*np.cos(eq[4,1])*np.sin(eq[2,1])+eq[3,1]*np.sin(eq[4,1])*np.cos(eq[2,1]))*int(tf/2)     # y
 
@@ -380,7 +380,7 @@ if Task1 == True:
   uu_star = uu[:,:,kk]
   uu_star[:,-1] = uu_star[:,-3]        # for plotting purposes
 
-  # Plots
+  # Plots of descent direction and cost
 
   plt.figure('descent direction')
   plt.plot(np.arange(kk), descent[:kk])
@@ -513,13 +513,15 @@ if Task2 == True:
   traj_smooth[:3,:] = traj_ref[:3,:]
 
   for i in range (3,ns+ni):
-    new_num_points = 7      # Adjust the number of points for a smoother curve
+    new_num_points = 7     # Adjust the number of points for a smoother curve
     interp_indices = np.linspace(0, tf, new_num_points)
     new_traj_ref_0 = np.interp(interp_indices, tt_hor, traj_ref[i,:])
 
     # define point to create spline
-    x_spl = np.array([interp_indices[0], interp_indices[1], interp_indices[2], interp_indices[4], interp_indices[5], interp_indices[6]])
-    y_spl = np.array([new_traj_ref_0[0], new_traj_ref_0[1], new_traj_ref_0[2], new_traj_ref_0[4], new_traj_ref_0[5], new_traj_ref_0[6]])
+    x_spl = np.copy(interp_indices)  
+    x_spl = np.delete(x_spl, int((new_num_points-1)/2))
+    y_spl = np.copy(new_traj_ref_0) 
+    y_spl = np.delete(y_spl, int((new_num_points-1)/2))
 
     # Create a piecewise cubic Hermite interpolating polynomial(PCHIP) interpolation of the given points
     cs = PchipInterpolator(x_spl, y_spl)
@@ -819,7 +821,7 @@ if Task4 == True & Task2 == True:
     for tt in range(tl, tl + T_pred -1):
       cost += cp.quad_form(xx_mpc[:,tt-tl] - xx_star[:,tt], QQ) + cp.quad_form(uu_mpc[:,tt-tl] - uu_star[:,tt], RR)
       constr += [xx_mpc[:,tt+1-tl] == AA[:,:,tt]@xx_mpc[:,tt-tl] + BB[:,:,tt]@uu_mpc[:,tt-tl],  # dynamics constraint
-              # other max values contrant
+              # other max/min values contrant
               uu_mpc[1,tt-tl] <= umax,
               xx_mpc[4,tt-tl] >= xmin,
               ]
@@ -876,8 +878,7 @@ if Task4 == True & Task2 == True:
   #######################################
 
   time = np.arange(Tsim-T_pred)
-  print('\nt sim\n', Tsim,'\nt pred\n', T_pred, '\nshape xx mpc\n', np.shape(xx_real_mpc), '\nshape time\n', np.shape(time), '\nspae xx star\n', np.shape(xx_star))
-
+  
   fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
   axs[0].plot(time, xx_real_mpc[0,:Tsim-T_pred],'m', linewidth=2)
@@ -972,7 +973,6 @@ if Task5:
   fig = plt.figure()
   ax = fig.add_subplot(111, autoscale_on=False, xlim=(min(xx_ref[0,:])-1, max(xx_ref[0,:])+1), ylim=(min(xx_ref[1,:])-1, max(xx_ref[1,:])+1))
   ax.grid()
-  # no labels
   ax.set_yticklabels([])
   ax.set_xticklabels([])
   ax.title.set_text('Animation of the Trajectory')
