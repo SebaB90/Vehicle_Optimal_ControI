@@ -853,7 +853,6 @@ if Task4 == True & Task2 == True:
   xx_mpc = np.zeros((ns, T_pred, Tsim))
 
   xx_real_mpc[:,0] = xx_star[:,0]
-  uu_real_mpc[:,0] = uu_star[:,0]
 
   for tt in range(Tsim-T_pred-1):
     # System evolution - real with MPC
@@ -865,7 +864,7 @@ if Task4 == True & Task2 == True:
     if tt%10 == 0: # print every 10 time instants
       print('MPC:\t t = {:.1f} sec.'.format(tt*dt))
     
-    QQt = np.diag([1, 1, 100.0, 1.0, 100.0, 100.0])   # cost for xx = [x,y,psi,V,Beta,psidot]
+    QQt = np.diag([1, 1, 100.0, 10.0, 1.0, 100.0])    # cost for xx = [x,y,psi,V,Beta,psidot]
     RRt = np.diag([1000.0, 1.0])                      # costs for uu = [Delta,F]
     QQT = QQt  # Terminal cost matrix
     
