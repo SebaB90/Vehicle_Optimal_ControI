@@ -31,7 +31,7 @@ plt.rcParams.update({'font.size': 22})
 # Algorithm parameters
 #######################################
 
-max_iters = int(2)
+max_iters = int(40)
 stepsize_0 = 1
 
 # ARMIJO PARAMETERS
@@ -246,7 +246,7 @@ for kk in range(max_iters-1):
   # Armijo plot
   ############################
 
-  if visu_armijo and kk%10 == 0:
+  if visu_armijo or kk%10 == 0:
 
     steps = np.linspace(0,stepsize_0,int(2e1))
     costs = np.zeros(len(steps))
@@ -283,9 +283,9 @@ for kk in range(max_iters-1):
     plt.clf()
 
     plt.plot(steps, costs, color='g', label='$J(\\mathbf{u}^k - stepsize*d^k)$')
-    plt.plot(steps, JJ[kk] + descent_arm[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+    plt.plot(steps, costs[0] + descent_arm[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
     # plt.plot(steps, JJ[kk] - descent[kk]*steps, color='r', label='$J(\\mathbf{u}^k) - stepsize*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
-    plt.plot(steps, JJ[kk] + cc*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$J(\\mathbf{u}^k) - stepsize*c*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
+    plt.plot(steps, costs[0] + cc*descent_arm[kk]*steps, color='g', linestyle='dashed', label='$J(\\mathbf{u}^k) - stepsize*c*\\nabla J(\\mathbf{u}^k)^{\\top} d^k$')
 
     plt.scatter(stepsizes, costs_armijo, marker='*') # plot the tested stepsize
 

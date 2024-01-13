@@ -10,7 +10,7 @@ import numpy as np
 ns = 2
 ni = 1
 
-dt = 1e-3 # discretization stepsize - Forward Euler
+dt = 1e-2 # discretization stepsize - Forward Euler
 
 # Dynamics parameters
 

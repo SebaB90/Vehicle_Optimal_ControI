@@ -30,9 +30,9 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 ############################################################
 
 test = False  # Set true for testing the open loop dynamics and the correctness of the derivatives
-max_iters = 20  # Choose the maximum number of iteration for the Newton's method
+max_iters = 35  # Choose the maximum number of iteration for the Newton's method
 # Set to true the task that you want to simulate
-Task1 = True  # Newton's method on a first try reference trajectory
+Task1 = False  # Newton's method on a first try reference trajectory
 Task2 = True  # Newton's method with smoothed trajectory
 Task3 = True  # Trajectory tracking via LQR, task 2 must be set to true
 Task4 = True  # MPC, Task2 must be set to true
@@ -378,7 +378,7 @@ if Task1 == True:
 
   xx_star = xx[:,:,kk]
   uu_star = uu[:,:,kk]
-  uu_star[:,-1] = uu_star[:,-3]        # for plotting purposes
+  uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
 
   # Plots of descent direction and cost
 
@@ -536,10 +536,10 @@ if Task2 == True:
     traj_smooth[i,:] = y_spl_new
 
     # Plotting the original and smoothed trajectories
+    axs[i].plot(x_spl_new, y_spl_new, linewidth=2, label='Smoothed Trajectory')
     axs[i].plot(tt_hor, traj_ref[i, :], 'm--', linewidth=2, label='Original Reference Trajectory')
-    axs[i].plot(interp_indices, new_traj_ref_0, 'g--', linewidth=2, label='Interpolated Trajectory')
-    axs[i].plot(x_spl, y_spl, 'o', label='Points used for spline creation')
-    axs[i].plot(x_spl_new, y_spl_new, 'b-', label='Smoothed Trajectory')
+    axs[i].plot(interp_indices, new_traj_ref_0, 'c--', linewidth=2, label='Interpolated Trajectory')
+    axs[i].plot(x_spl, y_spl, 'o', color='blue', label='Points used for spline creation')
     axs[i].grid()
     if i == ns+ni:
       axs[i].xlabel('time')
@@ -580,9 +580,10 @@ if Task2 == True:
 
   xx, uu, descent, JJ, kk = nwtn.Newton(xx, uu, xx_ref, uu_ref, x0, max_iters)
 
-  xx_star = xx[:,:,kk-1]
-  uu_star = uu[:,:,kk-1]
+  xx_star = xx[:,:,kk]
+  uu_star = uu[:,:,kk]
   uu_star[:,-1] = uu_star[:,-2]        # for plotting purposes
+  
 
   # Plots
 
@@ -662,7 +663,6 @@ if Task2 == True:
   plt.show()
 
 
-
 #######################################################################
 ############### TASK 3: TRAJECTORY TRACKING VIA LQR ###################
 #######################################################################
@@ -727,13 +727,17 @@ if Task3 == True & Task2 == True:
   uu_temp = np.zeros((ni,TT))
 
   xx_temp[:,0] = np.array((0,0,0,2,0.3,0.01))      # initial conditions different from the ones of xx0_star 
+  #xx_temp[:,0] = np.array((0,0,0,5,-0.3,-0.1)) 
+  #xx_temp[:,0] = np.copy(xx_star[:,0]) 
+
 
   for tt in range(TT-1):
     uu_temp[:,tt] = uu_star[:,tt] + KK_reg[:,:,tt]@(xx_temp[:,tt]-xx_star[:,tt])
     xx_temp[:,tt+1] = dyn.dynamics(xx_temp[:,tt], uu_temp[:,tt])[0]
 
-  uu_reg = uu_temp
   xx_reg = xx_temp
+  uu_reg = uu_temp
+  uu_reg[:,-1] = uu_reg[:,-2]        # for plotting purposes
 
   ##############################################################
   # Design REGULARIZED TRAJECTORY  
@@ -786,8 +790,8 @@ if Task3 == True & Task2 == True:
   plt.show()
 
   # Plotting the trajectory
-  plt.plot(xx_star[0,:], xx_star[1,:], label='Regularized Trajectory')
-  plt.plot(xx_reg[0,:], xx_reg[1,:],'m--', label='Optimal Trajectory')
+  plt.plot(xx_reg[0,:], xx_reg[1,:], label='Regularized Trajectory')
+  plt.plot(xx_star[0,:], xx_star[1,:],'m--', label='Optimal Trajectory')
   plt.title('Vehicle Trajectory')
   plt.xlabel('X-axis')
   plt.ylabel('Y-axis')
@@ -808,7 +812,7 @@ if Task4 == True & Task2 == True:
 
   Tsim = TT
 
-  def linear_mpc(AA, BB, QQ, RR, tl, QQf, xxt, umax, xmin, T_pred):
+  def linear_mpc(AA, BB, QQ, RR, tl, QQf, xxt, umax, T_pred):
 
     xxt = xxt.squeeze()
     
@@ -823,7 +827,6 @@ if Task4 == True & Task2 == True:
       constr += [xx_mpc[:,tt+1-tl] == AA[:,:,tt]@xx_mpc[:,tt-tl] + BB[:,:,tt]@uu_mpc[:,tt-tl],  # dynamics constraint
               # other max/min values contrant
               uu_mpc[1,tt-tl] <= umax,
-              xx_mpc[4,tt-tl] >= xmin,
               ]
 
     # sums problem objectives and concatenates constraints.
@@ -843,18 +846,20 @@ if Task4 == True & Task2 == True:
   # Model Predictive Control
   #############################
 
-  T_pred = int(TT/5)      # MPC Prediction horizon
-  u1max = 1100
-  x4min = -0.015
+  T_pred = 60      # MPC Prediction horizon
+  u1max = 1250
 
   xx_real_mpc = np.zeros((ns,Tsim))
   uu_real_mpc = np.zeros((ni,Tsim))
 
   xx_mpc = np.zeros((ns, T_pred, Tsim))
+  uu_mpc = np.zeros((ni, T_pred, Tsim))
 
-  xx_real_mpc[:,0] = xx_star[:,0]
+  xx_real_mpc[:,0] = np.array((0,0,0,2,0.3,0.01))      # initial conditions different from the ones of xx0_star 
+  #xx_real_mpc[:,0] = np.array((0,0,0,5,-0.3,-0.1)) 
+  #xx_real_mpc[:,0] = np.copy(xx_star[:,0]) 
 
-  for tt in range(Tsim-T_pred-1):
+  for tt in range(Tsim-1):
     # System evolution - real with MPC
 
     xx_t_mpc = xx_real_mpc[:,tt]  # get initial condition
@@ -863,98 +868,105 @@ if Task4 == True & Task2 == True:
 
     if tt%10 == 0: # print every 10 time instants
       print('MPC:\t t = {:.1f} sec.'.format(tt*dt))
-    
-    QQt = np.diag([1, 1, 100.0, 10.0, 1.0, 100.0])    # cost for xx = [x,y,psi,V,Beta,psidot]
-    RRt = np.diag([1000.0, 1.0])                      # costs for uu = [Delta,F]
-    QQT = QQt  # Terminal cost matrix
-    
-    uu_real_mpc[:,tt], xx_mpc[:,:,tt] = linear_mpc(A_opt, B_opt, QQt, RRt, tt, QQT, xx_t_mpc, umax=u1max, xmin=x4min, T_pred = T_pred)[:2]
-    
-    xx_real_mpc[:,tt+1] = dyn.dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
 
+    # Change the following matrices if needed and use them instead of the ones defined in Costs.py
+    QQt = 0.1*np.diag([1.0, 1.0, 1000.0, 10000.0, 1000.0, 1000.0])    # cost for xx = [x,y,psi,V,Beta,psidot]
+    RRt = 0.1*np.diag([1000.0, 0.0001])                               # costs for uu = [Delta,F]
+    QQT = QQt   # Terminal cost matrix
+
+    if tt < Tsim-T_pred:
+      xx_mpc[:,:,tt], uu_mpc[:,:,tt]  = linear_mpc(A_opt, B_opt, cst.QQt, cst.RRt, tt, cst.QQT, xx_t_mpc, umax=u1max, T_pred = T_pred)[1:]
+      
+      uu_real_mpc[:,tt] = uu_mpc[:,0,tt]
+      xx_real_mpc[:,tt+1] = dyn.dynamics(xx_real_mpc[:,tt], uu_real_mpc[:,tt])[0]
+
+    else:
+      uu_real_mpc[:,tt] = uu_mpc[:,tt-(Tsim-T_pred),Tsim-T_pred-1]
+      xx_real_mpc[:,tt+1] = dyn.dynamics(xx_mpc[:,tt-(Tsim-T_pred),Tsim-T_pred-1], uu_real_mpc[:,tt])[0]
+
+  uu_real_mpc[:,-1] = uu_real_mpc[:,-2]        # for plotting purposes
   #######################################
   # Plots
   #######################################
 
-  time = np.arange(Tsim-T_pred)
+  time = np.arange(Tsim)
   
   fig, axs = plt.subplots(ns+ni, 1, sharex='all')
 
-  axs[0].plot(time, xx_real_mpc[0,:Tsim-T_pred],'m', linewidth=2)
-  axs[0].plot(time, xx_star[0,:Tsim-T_pred],'--g', linewidth=2)
+  axs[0].plot(time, xx_real_mpc[0,:Tsim],'m', linewidth=2, label='MPC')
+  axs[0].plot(time, xx_star[0,:Tsim],'--g', linewidth=2, label='Optimal')
   axs[0].grid()
   axs[0].set_ylabel('$x$')
-  axs[0].set_xlim([-1,Tsim-T_pred])
-  axs[0].legend(['MPC', 'OPT'])
+  axs[0].set_xlim([-1,Tsim])
 
   #####
-  axs[1].plot(time, xx_real_mpc[1,:Tsim-T_pred],'m', linewidth=2)
-  axs[1].plot(time, xx_star[1,:Tsim-T_pred], '--g', linewidth=2)
+  axs[1].plot(time, xx_real_mpc[1,:Tsim],'m', linewidth=2, label='MPC')
+  axs[1].plot(time, xx_star[1,:Tsim], '--g', linewidth=2, label='Optimal')
   axs[1].grid()
   axs[1].set_ylabel('$y$')
-  axs[1].set_xlim([-1,Tsim-T_pred])
-  axs[1].legend(['MPC', 'OPT'])
+  axs[1].set_xlim([-1,Tsim])
 
   #####
-  axs[2].plot(time, xx_real_mpc[2,:Tsim-T_pred],'m', linewidth=2)
-  axs[2].plot(time, xx_star[2,:Tsim-T_pred], '--g', linewidth=2)
+  axs[2].plot(time, xx_real_mpc[2,:Tsim],'m', linewidth=2, label='MPC')
+  axs[2].plot(time, xx_star[2,:Tsim], '--g', linewidth=2, label='Optimal')
   axs[2].grid()
   axs[2].set_ylabel('$psi$')
-  axs[2].set_xlim([-1,Tsim-T_pred])
-  axs[2].legend(['MPC', 'OPT'])
+  axs[2].set_xlim([-1,Tsim])
 
   #####
-  axs[3].plot(time, xx_real_mpc[3,:Tsim-T_pred],'m', linewidth=2)
-  axs[3].plot(time, xx_star[3,:Tsim-T_pred], '--g', linewidth=2)
+  axs[3].plot(time, xx_real_mpc[3,:Tsim],'m', linewidth=2, label='MPC')
+  axs[3].plot(time, xx_star[3,:Tsim], '--g', linewidth=2, label='Optimal')
   axs[3].grid()
   axs[3].set_ylabel('$V$')
-  axs[3].set_xlim([-1,Tsim-T_pred])
-  axs[3].legend(['MPC', 'OPT'])
+  axs[3].set_xlim([-1,Tsim])
 
   #####
-  axs[4].plot(time, xx_real_mpc[4,:Tsim-T_pred],'m', linewidth=2)
-  axs[4].plot(time, xx_star[4,:Tsim-T_pred], '--g', linewidth=2)
-  
-  if x4min > 1.1*np.amin(xx_real_mpc[4,:Tsim-T_pred]): # draw constraints only if active
-    axs[4].plot(time, np.ones(Tsim-T_pred)*x4min, '--r', linewidth=1)
-    
+  axs[4].plot(time, xx_real_mpc[4,:Tsim],'m', linewidth=2, label='MPC')
+  axs[4].plot(time, xx_star[4,:Tsim], '--g', linewidth=2, label='Optimal')
   axs[4].grid()
   axs[4].set_ylabel('$beta$')
-  axs[4].set_xlim([-1,Tsim-T_pred])
-  axs[4].legend(['MPC', 'OPT'])
+  axs[4].set_xlim([-1,Tsim])
 
   #####
-  axs[5].plot(time, xx_real_mpc[5,:Tsim-T_pred],'m', linewidth=2)
-  axs[5].plot(time, xx_star[5,:Tsim-T_pred], '--g', linewidth=2)
+  axs[5].plot(time, xx_real_mpc[5,:Tsim],'m', linewidth=2, label='MPC')
+  axs[5].plot(time, xx_star[5,:Tsim], '--g', linewidth=2, label='Optimal')
   axs[5].grid()
   axs[5].set_ylabel('$psi dot$')
   axs[5].set_xlim([-1,Tsim-T_pred])
-  axs[5].legend(['MPC', 'OPT'])
 
   #####
-  axs[6].plot(time, uu_real_mpc[0,:Tsim-T_pred],'m', linewidth=2)
-  axs[6].plot(time, uu_star[0,:Tsim-T_pred],'--g', linewidth=2)
+  axs[6].plot(time, uu_real_mpc[0,:Tsim],'m', linewidth=2, label='MPC')
+  axs[6].plot(time, uu_star[0,:Tsim],'--g', linewidth=2, label='Optimal')
   axs[6].grid()
   axs[6].set_ylabel('$delta$')
   axs[6].set_xlabel('time')
   axs[6].set_xlim([-1,Tsim-T_pred])
-  axs[6].legend(['MPC', 'OPT'])
 
   #####
-  axs[7].plot(time, uu_real_mpc[1,:Tsim-T_pred],'m', linewidth=2)
-  axs[7].plot(time, uu_star[1,:Tsim-T_pred],'--g', linewidth=2)
+  axs[7].plot(time, uu_real_mpc[1,:Tsim],'m', linewidth=2, label='MPC')
+  axs[7].plot(time, uu_star[1,:Tsim],'--g', linewidth=2, label='Optimal')
   
-  if u1max < 1.1*np.amax(uu_real_mpc[1,:Tsim-T_pred]): # draw constraints only if active
-    axs[7].plot(time, np.ones(Tsim-T_pred)*u1max, '--r', linewidth=1)
+  if u1max < 1.1*np.amax(uu_real_mpc[1,:Tsim]): # draw constraints only if active
+    axs[7].plot(time, np.ones(Tsim)*u1max, '--b', linewidth=1, label='Boundary')
     
   axs[7].grid()
   axs[7].set_ylabel('$F$')
   axs[7].set_xlabel('time')
-  axs[7].set_xlim([-1,Tsim-T_pred])
-  axs[7].legend(['MPC', 'OPT'])
+  axs[7].set_xlim([-1,Tsim])
 
   fig.align_ylabels(axs)
-
+  
+  plt.legend()
+  plt.show()
+  
+  # Plotting the trajectory
+  plt.plot(xx_real_mpc[0,:], xx_real_mpc[1,:], label='MPC Trajectory')
+  plt.plot(xx_star[0,:], xx_star[1,:],'m--', label='Optimal Trajectory')
+  plt.title('Vehicle Trajectory')
+  plt.xlabel('X-axis')
+  plt.ylabel('Y-axis')
+  plt.legend()
+  plt.grid(True)
   plt.show()
 
 
