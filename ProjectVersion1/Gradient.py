@@ -1,8 +1,8 @@
 #
-# OPTCON PROJECT 
-# Optimal Control of a Veichle
-# Antonio Rapallini & Sebastiano Bertamé
-# Bologna, 22/11/2022
+# Optimal Control of a Veichle 
+# Gradient's Method
+# Rapallini Antonio & Sebastiano Bertamé
+# Bologna, 04/01/2022
 #
 
 import numpy as np

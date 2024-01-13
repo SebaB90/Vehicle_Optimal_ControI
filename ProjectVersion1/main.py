@@ -1,7 +1,7 @@
 #
-# Optimal Control of a vehicle
+# Optimal Control of a Vehicle
 # Main
-# Antonio Rapallini & Sebastiano Bertamé
+# Rapallini Antonio & Sebastiano Bertamé
 # Bologna, 04/01/2024
 #
 
@@ -32,7 +32,7 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 test = False  # Set true for testing the open loop dynamics and the correctness of the derivatives
 max_iters = 35  # Choose the maximum number of iteration for the Newton's method
 # Set to true the task that you want to simulate
-Task1 = False  # Newton's method on a first try reference trajectory
+Task1 = True  # Newton's method on a first try reference trajectory
 Task2 = True  # Newton's method with smoothed trajectory
 Task3 = True  # Trajectory tracking via LQR, task 2 must be set to true
 Task4 = True  # MPC, Task2 must be set to true
@@ -1005,8 +1005,8 @@ if Task5:
   
 
   ax2.grid(which='both')
-  ax2.plot(time, xx_reg[3],c='b')
-  ax2.plot(time, xx_ref[3], c='g', dashes=[2, 1])
+  ax2.plot(time, xx_reg[2],c='b')
+  ax2.plot(time, xx_ref[2], c='g', dashes=[2, 1])
   ax2.title.set_text('psi')
 
   point1, = ax2.plot([], [], 'o', lw=2, c='b')
@@ -1033,7 +1033,7 @@ if Task5:
     thisy1 = [xx_ref[1, :]]
     line1.set_data(thisx1, thisy1)
 
-    point1.set_data(i*dt, xx_reg[3, i])
+    point1.set_data(i*dt, xx_reg[2, i])
 
     time_text.set_text(time_template % (i*dt))
     return line0, line1, time_text, point1

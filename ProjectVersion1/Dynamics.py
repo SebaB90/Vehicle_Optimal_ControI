@@ -1,7 +1,7 @@
 #
-# Optimal Control of aa vehicle
-# Discrete-time nonlinear dynamics of aa vehicle
-# Bertamè Sebastiano
+# Optimal Control of a Vehicle
+# Discrete-time Nonlinear Dynamics of a Vehicle
+# Rapallini Antonio & Bertamè Sebastiano
 # Bologna, 04/01/2024
 #
 

@@ -1,7 +1,7 @@
 #
-# Optimal Control of a vehicle
-# Cost functions
-# Bertamè Sebastiano
+# Optimal Control of a Vehicle
+# Cost Functions
+# Rapallini Antonio & Bertamè Sebastiano 
 # Bologna, 04/01/2024
 #
 

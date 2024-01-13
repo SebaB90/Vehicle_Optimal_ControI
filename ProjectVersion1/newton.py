@@ -1,9 +1,10 @@
 #
-# OPTCON PROJECT 
-# Optimal Control of a Veichle
-# Antonio Rapallini & Sebastiano Bertamé
-# Bologna, 22/11/2022
+# Optimal Control of a Vehicle
+# Newton's Method
+# Rapallini Antonio & Sebastiano Bertamé
+# Bologna, 04/01/2022
 #
+
 import sys
 import numpy as np
 import scipy as sp
@@ -28,7 +29,7 @@ c = 0.5
 beta = 0.7
 armijo_maxiters = 20    # number of Armijo iterations
 stepsize_0 = 1          # initial stepsize
-armijo_plt = True
+armijo_plt = False
 
 # Import the cost matrices from costs
 Qt = cst.QQt
