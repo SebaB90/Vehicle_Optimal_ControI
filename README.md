@@ -12,5 +12,5 @@ The work is structured into a series of tasks, each building upon the last to ev
 
 The job has been done entirely in Python, and this report documents our approach, our analyses, and implemented solutions for addressing the challenges posed by optimal vehicle control. We present our findings, supported by graphical representations for clarity and visualization.
 
-###Check out the report pdf to have a complete overview of the project and the obtained results.
+### Check out the report pdf to have a complete overview of the project and the obtained results.
 
